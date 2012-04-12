@@ -1,0 +1,425 @@
+package com.google.code.inject.jaxrs;
+
+import static com.google.inject.internal.util.$Preconditions.checkNotNull;
+import static com.google.inject.internal.util.$Preconditions.checkState;
+import static com.google.inject.multibindings.Multibinder.newSetBinder;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.MessageBodyReader;
+import javax.ws.rs.ext.MessageBodyWriter;
+
+import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
+import org.apache.cxf.jaxrs.ext.RequestHandler;
+import org.apache.cxf.jaxrs.ext.ResponseHandler;
+import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
+import org.apache.cxf.message.Exchange;
+import org.apache.cxf.service.invoker.Invoker;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.BindingAnnotation;
+import com.google.inject.Key;
+import com.google.inject.Singleton;
+import com.google.inject.TypeLiteral;
+import com.google.inject.binder.ScopedBindingBuilder;
+import com.google.inject.multibindings.Multibinder;
+
+/**
+ * CXF EDSL Module.
+ * <p>
+ * 
+ * Example usage:
+ * 
+ * <pre>
+ * {@code
+ * protected void configureResources() {
+ * 	serve().atAddress(&quot;/rest&quot;);
+ * 
+ * 	publish(MyResource.class);
+ * 
+ * 	readAndWriteBody(JAXBElementProvider.class);
+ * 	readAndWriteBody(JSONProvider.class);
+ * 
+ * 	mapExceptions(ApplicationExceptionMapper.class);
+ * }
+ * </pre>
+ * 
+ * then do
+ * 
+ * <pre>
+ * {@code injector.getInstance(JAXRSServerFactoryBean.class).create(); }
+ * </pre>
+ * 
+ */
+public abstract class CXFModule extends AbstractModule {
+
+	/**
+	 * Default invoker marker class. Do not use for actual operation.
+	 */
+	public final static class DefaultInvoker implements Invoker {
+
+		@Override
+		public Object invoke(Exchange arg0, Object arg1) {
+			throw new UnsupportedOperationException();
+		}
+
+		/**
+		 * Is an invoker a default marker.
+		 * 
+		 * @param invoker
+		 *            instance to check
+		 * @return true if invoker is an instance of DefaultInvoker
+		 */
+		public static boolean isDefault(Invoker invoker) {
+			return invoker instanceof DefaultInvoker;
+		}
+
+	}
+
+	/**
+	 * Annotation for marking JAX-RS providers
+	 */
+	@BindingAnnotation
+	@Target({ FIELD, PARAMETER, METHOD })
+	@Retention(RUNTIME)
+	public @interface JaxRsProvider {
+
+	}
+
+	private final class ServerConfig implements ServerConfiguration,
+			ServerConfigurationBuilder {
+		private String address = "/";
+		private boolean staticResourceResolution = false;
+
+		@Override
+		public ServerConfigurationBuilder atAddress(String address) {
+			this.address = address;
+			return this;
+		}
+
+		@Override
+		public String getAddress() {
+			return address;
+		}
+
+		@Override
+		public boolean isStaticResourceResolution() {
+			return staticResourceResolution;
+		}
+
+		@Override
+		public ServerConfigurationBuilder withStaticResourceResolution() {
+			this.staticResourceResolution = true;
+			return this;
+		}
+
+	}
+
+	/**
+	 * Server config bean
+	 */
+	public interface ServerConfiguration {
+
+		String getAddress();
+
+		boolean isStaticResourceResolution();
+
+	}
+
+	/**
+	 * Server config builder
+	 */
+	protected interface ServerConfigurationBuilder {
+
+		/**
+		 * Server root address. Defaults to "/".
+		 * 
+		 * @param address
+		 *            root address
+		 * @return self
+		 */
+		ServerConfigurationBuilder atAddress(String address);
+
+		/**
+		 * Use static resource resolution
+		 * 
+		 * @return self
+		 */
+		ServerConfigurationBuilder withStaticResourceResolution();
+
+	}
+
+	private ServerConfig config;
+
+	private boolean customInvoker;
+
+	private Multibinder<Object> providers;
+
+	private Multibinder<ResourceProvider> resourceProviders;
+
+	@Override
+	protected final void configure() {
+		checkState(resourceProviders == null, "Re-entry is not allowed.");
+		checkState(providers == null, "Re-entry is not allowed.");
+		checkState(config == null, "Re-entry is not allowed.");
+
+		resourceProviders = newSetBinder(binder(), ResourceProvider.class);
+		providers = newSetBinder(binder(), Object.class, JaxRsProvider.class);
+		config = new ServerConfig();
+		customInvoker = false;
+
+		try {
+			configureResources();
+			bind(ServerConfiguration.class).toInstance(config);
+			bind(JAXRSServerFactoryBean.class).toProvider(
+					JaxRsServerFactoryBeanProvider.class).in(Singleton.class);
+			if (!customInvoker)
+				bind(Invoker.class).to(DefaultInvoker.class);
+
+		} finally {
+			resourceProviders = null;
+			providers = null;
+			config = null;
+		}
+	}
+
+	/**
+	 * Override this method to configure CXF
+	 */
+	protected abstract void configureResources();
+
+	/**
+	 * DRY binding helper for @Provider
+	 * 
+	 * @param key
+	 *            key to bind
+	 */
+	private void doBind(Key<?> key) {
+		checkNotNull(key);
+		providers.addBinding().to(key);
+	}
+
+	/**
+	 * DRY binding helper for @Provider
+	 * 
+	 * @param type
+	 *            type to bind
+	 */
+	private void doBind(Type type) {
+		checkNotNull(type);
+		doBind(Key.get(type));
+	}
+
+	/**
+	 * DRY binding helper for @Provider
+	 * 
+	 * @param type
+	 *            type to bind
+	 */
+	private void doBind(TypeLiteral<?> type) {
+		checkNotNull(type);
+		doBind(Key.get(type));
+	}
+
+	/**
+	 * Configure server
+	 * 
+	 * @return configuration builder
+	 */
+	protected final ServerConfigurationBuilder serve() {
+		return this.config;
+	}
+
+	/**
+	 * Bind custom invoker
+	 * 
+	 * @param type
+	 *            type to bind
+	 * @return binding builder for the invoker
+	 */
+	protected final ScopedBindingBuilder invokeVia(Class<? extends Invoker> type) {
+		checkState(!customInvoker, "Custom invoker bound twice");
+		this.customInvoker = true;
+		return bind(Invoker.class).to(type);
+	}
+
+	/**
+	 * Bind custom invoker
+	 * 
+	 * @param type
+	 *            type to bind
+	 * @return binding builder for the invoker
+	 */
+	protected final ScopedBindingBuilder invokeVia(Key<? extends Invoker> type) {
+		checkState(!customInvoker, "Custom invoker bound twice");
+		this.customInvoker = true;
+		return bind(Invoker.class).to(type);
+	}
+
+	/**
+	 * Bind custom invoker
+	 * 
+	 * @param type
+	 *            type to bind
+	 * @return binding builder for the invoker
+	 */
+	protected final ScopedBindingBuilder invokeVia(
+			TypeLiteral<? extends Invoker> type) {
+		checkState(!customInvoker, "Custom invoker bound twice");
+		this.customInvoker = true;
+		return bind(Invoker.class).to(type);
+	}
+
+	/**
+	 * Bind a resource class
+	 * 
+	 * @param key
+	 *            to bind
+	 */
+	protected final void publish(final Key<?> key) {
+		checkNotNull(key);
+
+		@SuppressWarnings("unchecked")
+		final Key<? extends ResourceProvider> providerKey = (Key<? extends ResourceProvider>) Key
+				.get(new ParameterizedType() {
+
+					@Override
+					public Type[] getActualTypeArguments() {
+						return new Type[] { key.getTypeLiteral().getType() };
+					}
+
+					@Override
+					public Type getOwnerType() {
+						return null;
+					}
+
+					@Override
+					public Type getRawType() {
+						return GuicePerRequestResourceProvider.class;
+					}
+				});
+		resourceProviders.addBinding().to(providerKey).in(Singleton.class);
+
+	}
+
+	/**
+	 * Bind a resource class
+	 * 
+	 * @param type
+	 *            to bind
+	 */
+	protected final void publish(final Type type) {
+		checkNotNull(type);
+		publish(Key.get(type));
+	}
+
+	/**
+	 * Bind a resource class
+	 * 
+	 * @param type
+	 *            to bind
+	 */
+	protected final void publish(final TypeLiteral<?> type) {
+		checkNotNull(type);
+		publish(Key.get(type));
+	}
+
+	protected final void handleRequest(Class<? extends RequestHandler> type) {
+		doBind(type);
+	}
+
+	protected final void handleRequest(Key<? extends RequestHandler> key) {
+		doBind(key);
+	}
+
+	protected final void handleRequest(
+			TypeLiteral<? extends RequestHandler> type) {
+		doBind(type);
+	}
+
+	protected final void handleResponse(Class<? extends ResponseHandler> type) {
+		doBind(type);
+	}
+
+	protected final void handleResponse(Key<? extends ResponseHandler> key) {
+		doBind(key);
+	}
+
+	protected final void handleResponse(
+			TypeLiteral<? extends ResponseHandler> type) {
+		doBind(type);
+	}
+
+	protected final void mapExceptions(Class<? extends ExceptionMapper<?>> type) {
+		doBind(type);
+	}
+
+	protected final void mapExceptions(Key<? extends ExceptionMapper<?>> key) {
+		doBind(key);
+	}
+
+	protected final void mapExceptions(
+			TypeLiteral<? extends ExceptionMapper<?>> type) {
+		doBind(type);
+	}
+
+	protected final void provide(Class<?> type) {
+		doBind(type);
+	}
+
+	protected final void provide(Key<?> key) {
+		doBind(key);
+	}
+
+	protected final void provide(TypeLiteral<?> type) {
+		doBind(type);
+	}
+
+	protected final void readBody(Class<? extends MessageBodyReader<?>> type) {
+		doBind(type);
+	}
+
+	protected final void readBody(Key<? extends MessageBodyReader<?>> key) {
+		doBind(key);
+	}
+
+	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void readBody(
+			TypeLiteral<T> type) {
+		doBind(type);
+	}
+
+	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void writeAndReadBody(
+			Class<T> type) {
+		doBind(type);
+	}
+
+	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void writeAndReadBody(
+			Key<T> key) {
+		doBind(key);
+	}
+
+	protected final void writeAndReadBody(
+			TypeLiteral<? extends MessageBodyReader<?>> type) {
+		doBind(type);
+	}
+
+	protected final void writeBody(Class<? extends MessageBodyWriter<?>> type) {
+		doBind(type);
+	}
+
+	protected final void writeBody(Key<? extends MessageBodyWriter<?>> key) {
+		doBind(key);
+	}
+
+	protected final void writeBody(
+			TypeLiteral<? extends MessageBodyWriter<?>> type) {
+		doBind(type);
+	}
+
+}

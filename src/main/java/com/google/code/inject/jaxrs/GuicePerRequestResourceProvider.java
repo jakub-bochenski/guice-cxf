@@ -1,0 +1,40 @@
+package com.google.code.inject.jaxrs;
+
+import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
+import org.apache.cxf.message.Message;
+
+import com.google.inject.Inject;
+import com.google.inject.Provider;
+
+public class GuicePerRequestResourceProvider<T> implements ResourceProvider {
+
+	private final Provider<T> provider;
+	private final Class<?> actualType;
+
+	@Inject
+	protected GuicePerRequestResourceProvider(Provider<T> provider) {
+		this.provider = provider;
+		this.actualType = provider.get().getClass();
+	}
+
+	@Override
+	public Object getInstance(Message m) {
+		return provider.get();
+	}
+
+	@Override
+	public void releaseInstance(Message m, Object o) {
+		// NOOP
+	}
+
+	@Override
+	public Class<?> getResourceClass() {
+		return actualType;
+	}
+
+	@Override
+	public boolean isSingleton() {
+		return false;
+	}
+
+}
