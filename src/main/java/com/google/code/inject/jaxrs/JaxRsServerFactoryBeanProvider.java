@@ -28,7 +28,6 @@ import javax.ws.rs.ext.Provider;
 
 import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
-import org.apache.cxf.jaxrs.utils.ResourceUtils;
 import org.apache.cxf.service.invoker.Invoker;
 
 import com.google.code.inject.jaxrs.CXFModule.JaxRsProvider;
@@ -44,7 +43,7 @@ public class JaxRsServerFactoryBeanProvider implements
 		for (final Object s : singletons) {
 			final Class<? extends Object> type = s.getClass();
 
-			if (!ResourceUtils.isValidResourceClass(type))
+			if (!isValidResourceClass(type))
 				throw new ProvisionException("Type " + type + " is not valid");
 
 			if (type.getAnnotation(Provider.class) == null)
