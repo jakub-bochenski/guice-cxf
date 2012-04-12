@@ -49,10 +49,9 @@ import com.google.inject.multibindings.Multibinder;
  * CXF EDSL Module.
  * <p>
  * 
- * Example usage:
+ * <b>Example usage:</b>
  * 
  * <pre>
- * {@code
  * protected void configureResources() {
  * 	serve().atAddress(&quot;/rest&quot;);
  * 
@@ -71,6 +70,108 @@ import com.google.inject.multibindings.Multibinder;
  * {@code injector.getInstance(JAXRSServerFactoryBean.class).create(); }
  * </pre>
  * 
+ * <p>
+ * 
+ * <h3>Language elements</h3>
+ * <p>
+ * Use <tt>publish()</tt> to register a resource class - a custom
+ * <tt>ResourceProvider</tt> will be bound for each resource class. It's a
+ * 'per-request' type and will get a new instance for each incoming request.
+ * </p>
+ * <p>
+ * Use <tt>serve()</tt> to configure server, e.g. set the root address.
+ * </p>
+ * <p>
+ * The following methods let you register JAX-RS <tt>@Provider</tt>s:
+ * </p>
+ * <ul>
+ * <li><tt>handleRequest()</tt> - register a <tt>RequestHandler</tt>;</li>
+ * <li><tt>handleResponse()</tt> - register a <tt>ResponseHandler</tt>;</li>
+ * <li><tt>mapExceptions()</tt> - register an <tt>ExceptionMapper</tt>;</li>
+ * <li><tt>readBody()</tt> - register a <tt>MessageBodyReader</tt>;</li>
+ * <li><tt>writeBody()</tt> - register a <tt>MessageBodyWriter</tt>;</li>
+ * <li><tt>writeAndReadBody()</tt> - register a class that is both a
+ * <tt>MessageBodyReader</tt> and a <tt>MessageBodyWriter</tt> (e.g.
+ * <tt>JAXBElementProvider</tt> or <tt>JSONProvider</tt>);</li>
+ * <li><tt>provide()</tt> - generic method to register any JAX-RS
+ * <tt>@Provider</tt>, it's best to use specific methods if available, since
+ * they are type safe;</li>
+ * </ul>
+ * <p>
+ * Above methods return a standard <tt>ScopedBindingBuilder</tt> so that you can
+ * use all the regular Guice constructs.
+ * </p>
+ * <p>
+ * <i>Please note that a single instance of each <tt>@Provider</tt> class will
+ * be passed to the <tt>ServerFactoryBean</tt>, regardless of the scope.</i>
+ * </p>
+ * <p>
+ * Use <tt>invokeVia()</tt> to register custom invoker.
+ * </p>
+ * <h3><a name="Binding_resources_and_providers"></a>Binding resources and
+ * providers<a href="#Binding_resources_and_providers"
+ * class="section_anchor"></a></h3>
+ * <p>
+ * It is possible to bind concrete classes, but a very nice feature is the
+ * ability to bind interfaces.
+ * </p>
+ * 
+ * <pre>
+ * protected void configureResources() {
+ * 	publish(ResourceInterface.class);
+ * }
+ * </pre>
+ * <p>
+ * Then in a separate module you can do something like
+ * <tt>bind(ResourceInterface.class).to(ResourceImpl.class);</tt> to define the
+ * concrete implementation. This let's you easily register mock objects for
+ * testing.
+ * </p>
+ * <p>
+ * Another use of indirect binding is configuring the <tt>@Provider</tt>s, see
+ * here an example configuration of the <tt>JSONProvider</tt>.
+ * </p>
+ * 
+ * <pre>
+ * &#064;Provides
+ * public JSONProvider provdeJsonProvider(
+ * 		&#064;Named(&quot;ignoreNamespaces&quot;) boolean ignoreNamespaces) {
+ * 	final JSONProvider json = new JSONProvider();
+ * 	json.setIgnoreNamespaces(ignoreNamespaces);
+ * 	return json;
+ * }
+ * </pre>
+ * <p>
+ * <i>Of course if you implement your own <tt>@Provider</tt>s it's best to use
+ * constructor/method injections directly on them.</i>
+ * 
+ * <h3>Bindings</h3>
+ * 
+ * The most important binding provided by the CXFModule is the
+ * <tt>JAXRSServerFactoryBean</tt>. You can use it to easily create a server by
+ * doing <tt>injector.getInstance(JAXRSServerFactoryBean.class).create()</tt>
+ * </p>
+ * <p>
+ * A set of <tt>ResourceProvider</tt>s will be bound using the multibinder. For
+ * each resource class a <tt>{@link GuicePerRequestResourceProvider}</tt>
+ * parametrized with the resource type will be registered.
+ * </p>
+ * <p>
+ * A <tt>Set&lt;Object&gt;</tt> annotated with <tt>{@link JaxRsProvider}</tt>
+ * will be bound containting an instance of each registered JAX-RS Provider
+ * </p>
+ * <p>
+ * A singleton instance of <tt>{@link ServerConfiguration}</tt> will be bound
+ * with configuration options.
+ * </p>
+ * <p>
+ * If a custom <tt>Invoker</tt> was configured it will be bound, otherwise a
+ * <tt>{@link DefaultInvoker}</tt> will be bound.
+ * </p>
+ * <p>
+ * With the exception of <tt>{@link ServerConfiguration}</tt> bean no instances
+ * of business classes are created during binding.
+ * </p>
  */
 public abstract class CXFModule extends AbstractModule {
 
