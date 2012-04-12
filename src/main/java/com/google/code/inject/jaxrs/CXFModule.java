@@ -123,7 +123,7 @@ import com.google.inject.multibindings.Multibinder;
  * </pre>
  * <p>
  * Then in a separate module you can do something like
- * <tt>bind(ResourceInterface.class).to(ResourceImpl.class);</tt> to define the
+ * <tt>bind(ResourceInterface.class).to(ResourceImpl.class)</tt> to define the
  * concrete implementation. This let's you easily register mock objects for
  * testing.
  * </p>
