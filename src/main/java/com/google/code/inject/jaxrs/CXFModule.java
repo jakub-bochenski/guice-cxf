@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Jakub Bocheñski (kuba.bochenski@gmail.com)
+ * Copyright 2012 Jakub BocheÃ±ski (kuba.bochenski@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,9 +108,8 @@ import com.google.inject.multibindings.Multibinder;
  * <p>
  * Use <tt>invokeVia()</tt> to register custom invoker.
  * </p>
- * <h3><a name="Binding_resources_and_providers"></a>Binding resources and
- * providers<a href="#Binding_resources_and_providers"
- * class="section_anchor"></a></h3>
+ * <h3>Binding resources and
+ * providers</h3>
  * <p>
  * It is possible to bind concrete classes, but a very nice feature is the
  * ability to bind interfaces.
