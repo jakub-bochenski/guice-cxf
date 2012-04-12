@@ -67,7 +67,7 @@ import com.google.inject.multibindings.Multibinder;
  * then do
  * 
  * <pre>
- * {@code injector.getInstance(JAXRSServerFactoryBean.class).create(); }
+ * injector.getInstance(JAXRSServerFactoryBean.class).create();
  * </pre>
  * 
  * <p>
@@ -207,7 +207,7 @@ public abstract class CXFModule extends AbstractModule {
 
 	}
 
-	private final class ServerConfig implements ServerConfiguration,
+	private final static class ServerConfig implements ServerConfiguration,
 			ServerConfigurationBuilder {
 		private String address = "/";
 		private boolean staticResourceResolution = false;
