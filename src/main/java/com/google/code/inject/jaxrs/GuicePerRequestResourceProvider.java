@@ -21,6 +21,8 @@ import org.apache.cxf.message.Message;
 import com.google.code.inject.jaxrs.util.BindingProvider;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+import com.google.inject.ProvisionException;
+import com.google.inject.Scope;
 
 class GuicePerRequestResourceProvider<T> implements ResourceProvider {
 
@@ -28,10 +30,13 @@ class GuicePerRequestResourceProvider<T> implements ResourceProvider {
 	private final Class<?> actualType;
 
 	@Inject
-	protected GuicePerRequestResourceProvider(BindingProvider<T> key,
+	protected GuicePerRequestResourceProvider(BindingProvider<T> binding,
 			Provider<T> provider) {
-		super();
-		this.actualType = key.getActualType();
+		final Scope scope = binding.getScope();
+		if (null != scope)
+			throw new ProvisionException("Invalid scope " + scope + " of "
+					+ binding.getKey());
+		this.actualType = binding.getActualType();
 		this.provider = provider;
 	}
 
