@@ -18,18 +18,21 @@ package com.google.code.inject.jaxrs;
 import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
 import org.apache.cxf.message.Message;
 
+import com.google.code.inject.jaxrs.util.BindingProvider;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 
-public class GuicePerRequestResourceProvider<T> implements ResourceProvider {
+class GuicePerRequestResourceProvider<T> implements ResourceProvider {
 
 	private final Provider<T> provider;
 	private final Class<?> actualType;
 
 	@Inject
-	protected GuicePerRequestResourceProvider(Provider<T> provider) {
+	protected GuicePerRequestResourceProvider(BindingProvider<T> key,
+			Provider<T> provider) {
+		super();
+		this.actualType = key.getActualType();
 		this.provider = provider;
-		this.actualType = provider.get().getClass();
 	}
 
 	@Override

@@ -15,7 +15,7 @@
  */
 package com.google.code.inject.jaxrs;
 
-import static com.google.code.inject.jaxrs.CXFModule.DefaultInvoker.isDefault;
+import static com.google.code.inject.jaxrs.internal.DefaultInvoker.isDefault;
 import static org.apache.cxf.jaxrs.utils.ResourceUtils.isValidResourceClass;
 
 import java.util.ArrayList;
@@ -30,12 +30,12 @@ import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
 import org.apache.cxf.service.invoker.Invoker;
 
-import com.google.code.inject.jaxrs.CXFModule.JaxRsProvider;
 import com.google.code.inject.jaxrs.CXFModule.ServerConfiguration;
+import com.google.code.inject.jaxrs.internal.JaxRsProvider;
 import com.google.inject.Inject;
 import com.google.inject.ProvisionException;
 
-public class JaxRsServerFactoryBeanProvider implements
+class JaxRsServerFactoryBeanProvider implements
 		com.google.inject.Provider<JAXRSServerFactoryBean> {
 
 	private static void verifySingletons(Iterable<Object> singletons) {

@@ -18,12 +18,7 @@ package com.google.code.inject.jaxrs;
 import static com.google.inject.internal.util.$Preconditions.checkNotNull;
 import static com.google.inject.internal.util.$Preconditions.checkState;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
-import static java.lang.annotation.ElementType.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
 import javax.ws.rs.ext.ExceptionMapper;
@@ -34,15 +29,19 @@ import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.ext.RequestHandler;
 import org.apache.cxf.jaxrs.ext.ResponseHandler;
 import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
-import org.apache.cxf.message.Exchange;
 import org.apache.cxf.service.invoker.Invoker;
 
+import com.google.code.inject.jaxrs.internal.DefaultInvoker;
+import com.google.code.inject.jaxrs.internal.JaxRsProvider;
+import com.google.code.inject.jaxrs.internal.SubresourceInterceptor;
+import com.google.code.inject.jaxrs.util.BindingProvider;
+import com.google.code.inject.jaxrs.util.ParametrizedType;
 import com.google.inject.AbstractModule;
-import com.google.inject.BindingAnnotation;
 import com.google.inject.Key;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.binder.ScopedBindingBuilder;
+import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
 
 /**
@@ -108,8 +107,7 @@ import com.google.inject.multibindings.Multibinder;
  * <p>
  * Use <tt>invokeVia()</tt> to register custom invoker.
  * </p>
- * <h3>Binding resources and
- * providers</h3>
+ * <h3>Binding resources and providers</h3>
  * <p>
  * It is possible to bind concrete classes, but a very nice feature is the
  * ability to bind interfaces.
@@ -174,43 +172,11 @@ import com.google.inject.multibindings.Multibinder;
  */
 public abstract class CXFModule extends AbstractModule {
 
-	/**
-	 * Default invoker marker class. Do not use for actual operation.
-	 */
-	public final static class DefaultInvoker implements Invoker {
-
-		@Override
-		public Object invoke(Exchange arg0, Object arg1) {
-			throw new UnsupportedOperationException();
-		}
-
-		/**
-		 * Is an invoker a default marker.
-		 * 
-		 * @param invoker
-		 *            instance to check
-		 * @return true if invoker is an instance of DefaultInvoker
-		 */
-		public static boolean isDefault(Invoker invoker) {
-			return invoker instanceof DefaultInvoker;
-		}
-
-	}
-
-	/**
-	 * Annotation for marking JAX-RS providers
-	 */
-	@BindingAnnotation
-	@Target({ FIELD, PARAMETER, METHOD })
-	@Retention(RUNTIME)
-	public @interface JaxRsProvider {
-
-	}
-
-	private final static class ServerConfig implements ServerConfiguration,
+	private final class ServerConfig implements ServerConfiguration,
 			ServerConfigurationBuilder {
 		private String address = "/";
 		private boolean staticResourceResolution = false;
+		private boolean subresourcesInjection = false;
 
 		@Override
 		public ServerConfigurationBuilder atAddress(String address) {
@@ -231,6 +197,11 @@ public abstract class CXFModule extends AbstractModule {
 		@Override
 		public ServerConfigurationBuilder withStaticResourceResolution() {
 			this.staticResourceResolution = true;
+			return this;
+		}
+
+		public ServerConfigurationBuilder withSubresourcesInjection() {
+			this.subresourcesInjection = true;
 			return this;
 		}
 
@@ -268,6 +239,13 @@ public abstract class CXFModule extends AbstractModule {
 		 */
 		ServerConfigurationBuilder withStaticResourceResolution();
 
+		/**
+		 * Enable AOP based sub-resource injection
+		 * 
+		 * @return self
+		 */
+		ServerConfigurationBuilder withSubresourcesInjection();
+
 	}
 
 	private ServerConfig config;
@@ -294,6 +272,16 @@ public abstract class CXFModule extends AbstractModule {
 			bind(ServerConfiguration.class).toInstance(config);
 			bind(JAXRSServerFactoryBean.class).toProvider(
 					JaxRsServerFactoryBeanProvider.class).in(Singleton.class);
+
+			if (config.subresourcesInjection) {
+				final SubresourceInterceptor interceptor = new SubresourceInterceptor();
+				bindInterceptor(Matchers.any(),
+						Matchers.annotatedWith(InjectedResource.class),
+						interceptor);
+
+				requestInjection(interceptor);
+			}
+
 			if (!customInvoker)
 				bind(Invoker.class).to(DefaultInvoker.class);
 
@@ -394,33 +382,31 @@ public abstract class CXFModule extends AbstractModule {
 	/**
 	 * Bind a resource class
 	 * 
-	 * @param key
+	 * @param resourceKey
 	 *            to bind
 	 */
-	protected final void publish(final Key<?> key) {
-		checkNotNull(key);
+	private final <T> void publish(final Key<T> resourceKey) {
+		checkNotNull(resourceKey);
+		final Type[] arguments = new Type[] { resourceKey.getTypeLiteral()
+				.getType() };
 
-		@SuppressWarnings("unchecked")
-		final Key<? extends ResourceProvider> providerKey = (Key<? extends ResourceProvider>) Key
-				.get(new ParameterizedType() {
+		final Key<? extends ResourceProvider> providerKey = new ParametrizedType(
+				GuicePerRequestResourceProvider.class) {
 
-					@Override
-					public Type[] getActualTypeArguments() {
-						return new Type[] { key.getTypeLiteral().getType() };
-					}
+			public Type[] getActualTypeArguments() {
+				return arguments;
+			}
+		}.asKey();
 
-					@Override
-					public Type getOwnerType() {
-						return null;
-					}
-
-					@Override
-					public Type getRawType() {
-						return GuicePerRequestResourceProvider.class;
-					}
-				});
 		resourceProviders.addBinding().to(providerKey).in(Singleton.class);
+		final BindingProvider<T> binding = new BindingProvider<T>(resourceKey);
+		bind(new ParametrizedType(BindingProvider.class) {
 
+			public Type[] getActualTypeArguments() {
+				return arguments;
+			}
+		}.asKey()).toInstance(binding);
+		requestInjection(binding);
 	}
 
 	/**
@@ -440,7 +426,7 @@ public abstract class CXFModule extends AbstractModule {
 	 * @param type
 	 *            to bind
 	 */
-	protected final void publish(final TypeLiteral<?> type) {
+	protected final <T> void publish(final TypeLiteral<T> type) {
 		checkNotNull(type);
 		publish(Key.get(type));
 	}

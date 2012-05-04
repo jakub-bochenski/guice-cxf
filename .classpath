@@ -7,5 +7,6 @@
 	<classpathentry kind="lib" path="dep/main/java/guice-multibindings-3.0.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/cxf-2.5.2.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/javax.inject.jar"/>
+	<classpathentry kind="lib" path="dep/main/java/aopalliance.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
