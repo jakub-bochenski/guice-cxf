@@ -49,7 +49,6 @@ public class BindingProvider<T> {
 
 	private final Key<T> key;
 	private Class<?> actualType;
-	private Binding<T> binding;
 	private Scope scope;
 
 	public BindingProvider(Key<T> key) {
@@ -58,10 +57,6 @@ public class BindingProvider<T> {
 
 	public Class<?> getActualType() {
 		return actualType;
-	}
-
-	public Binding<T> getBinding() {
-		return binding;
 	}
 
 	public Key<T> getKey() {
@@ -78,7 +73,6 @@ public class BindingProvider<T> {
 
 	protected void setBinding(final Binding<T> binding,
 			final Map<Class<? extends Annotation>, Scope> scopeBindings) {
-		this.binding = binding;
 		this.scope = binding
 				.acceptScopingVisitor(new DefaultBindingScopingVisitor<Scope>() {
 					@Override
@@ -127,14 +121,9 @@ public class BindingProvider<T> {
 						try {
 							// FIXME this will incorrectly return any first type variable, 
 							// not necessarily that of Provider<T>
-							final TypeVariable<?> providerType = providerBinding
-									.getProvider().getClass()
-									.getTypeParameters()[0];
+							final Class<?> bound = getFirstTypeArgumentUpperBound(providerBinding
+									.getProvider().getClass());
 
-							final Type[] bounds = providerType.getBounds();
-							checkArgument(bounds.length == 1);
-
-							final Class<?> bound = (Class<?>) bounds[0];
 							checkArgument(key.getTypeLiteral().getRawType()
 									.isAssignableFrom(bound));
 
@@ -156,6 +145,17 @@ public class BindingProvider<T> {
 								"Unable to resolve target class for " + binding);
 					}
 				});
+	}
+
+	private static Class<?> getFirstTypeArgumentUpperBound(final Class<?> type) {
+		final TypeVariable<?> providerType = type.getTypeParameters()[0];
+
+		final Type[] bounds = providerType.getBounds();
+		checkArgument(bounds.length == 1);
+
+		final Class<?> bound = (Class<?>) bounds[0];
+
+		return bound;
 	}
 
 	@Inject
