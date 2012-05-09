@@ -15,6 +15,7 @@
  */
 package com.google.code.inject.jaxrs;
 
+import static com.google.inject.Scopes.SINGLETON;
 import static com.google.inject.internal.util.$Preconditions.checkNotNull;
 import static com.google.inject.internal.util.$Preconditions.checkState;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
@@ -37,10 +38,10 @@ import com.google.code.inject.jaxrs.internal.SubresourceInterceptor;
 import com.google.code.inject.jaxrs.util.BindingProvider;
 import com.google.code.inject.jaxrs.util.ParametrizedType;
 import com.google.inject.AbstractModule;
+import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
-import com.google.inject.binder.ScopedBindingBuilder;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
 
@@ -269,9 +270,10 @@ public abstract class CXFModule extends AbstractModule {
 
 		try {
 			configureResources();
-			bind(ServerConfiguration.class).toInstance(config);
-			bind(JAXRSServerFactoryBean.class).toProvider(
-					JaxRsServerFactoryBeanProvider.class).in(Singleton.class);
+			binder().bind(ServerConfiguration.class).toInstance(config);
+			binder().bind(JAXRSServerFactoryBean.class)
+					.toProvider(JaxRsServerFactoryBeanProvider.class)
+					.in(Singleton.class);
 
 			if (config.subresourcesInjection) {
 				final SubresourceInterceptor interceptor = new SubresourceInterceptor();
@@ -283,7 +285,8 @@ public abstract class CXFModule extends AbstractModule {
 			}
 
 			if (!customInvoker)
-				bind(Invoker.class).to(DefaultInvoker.class);
+				binder().bind(Invoker.class).to(DefaultInvoker.class)
+						.in(SINGLETON);
 
 		} finally {
 			resourceProviders = null;
@@ -296,39 +299,6 @@ public abstract class CXFModule extends AbstractModule {
 	 * Override this method to configure CXF
 	 */
 	protected abstract void configureResources();
-
-	/**
-	 * DRY binding helper for @Provider
-	 * 
-	 * @param key
-	 *            key to bind
-	 */
-	private void doBind(Key<?> key) {
-		checkNotNull(key);
-		providers.addBinding().to(key);
-	}
-
-	/**
-	 * DRY binding helper for @Provider
-	 * 
-	 * @param type
-	 *            type to bind
-	 */
-	private void doBind(Type type) {
-		checkNotNull(type);
-		doBind(Key.get(type));
-	}
-
-	/**
-	 * DRY binding helper for @Provider
-	 * 
-	 * @param type
-	 *            type to bind
-	 */
-	private void doBind(TypeLiteral<?> type) {
-		checkNotNull(type);
-		doBind(Key.get(type));
-	}
 
 	/**
 	 * Configure server
@@ -346,10 +316,8 @@ public abstract class CXFModule extends AbstractModule {
 	 *            type to bind
 	 * @return binding builder for the invoker
 	 */
-	protected final ScopedBindingBuilder invokeVia(Class<? extends Invoker> type) {
-		checkState(!customInvoker, "Custom invoker bound twice");
-		this.customInvoker = true;
-		return bind(Invoker.class).to(type);
+	protected final void invokeVia(Class<? extends Invoker> type) {
+		invokeVia(Key.get(type));
 	}
 
 	/**
@@ -359,10 +327,10 @@ public abstract class CXFModule extends AbstractModule {
 	 *            type to bind
 	 * @return binding builder for the invoker
 	 */
-	protected final ScopedBindingBuilder invokeVia(Key<? extends Invoker> type) {
+	protected final void invokeVia(Key<? extends Invoker> type) {
 		checkState(!customInvoker, "Custom invoker bound twice");
 		this.customInvoker = true;
-		return bind(Invoker.class).to(type);
+		binder().bind(Invoker.class).to(type).in(SINGLETON);
 	}
 
 	/**
@@ -372,11 +340,8 @@ public abstract class CXFModule extends AbstractModule {
 	 *            type to bind
 	 * @return binding builder for the invoker
 	 */
-	protected final ScopedBindingBuilder invokeVia(
-			TypeLiteral<? extends Invoker> type) {
-		checkState(!customInvoker, "Custom invoker bound twice");
-		this.customInvoker = true;
-		return bind(Invoker.class).to(type);
+	protected final void invokeVia(TypeLiteral<? extends Invoker> type) {
+		invokeVia(Key.get(type));
 	}
 
 	/**
@@ -399,14 +364,21 @@ public abstract class CXFModule extends AbstractModule {
 		}.asKey();
 
 		resourceProviders.addBinding().to(providerKey).in(Singleton.class);
+
 		final BindingProvider<T> binding = new BindingProvider<T>(resourceKey);
-		bind(new ParametrizedType(BindingProvider.class) {
+
+		binder().bind(new ParametrizedType(BindingProvider.class) {
 
 			public Type[] getActualTypeArguments() {
 				return arguments;
 			}
 		}.asKey()).toInstance(binding);
 		requestInjection(binding);
+	}
+
+	@Override
+	protected Binder binder() {
+		return super.binder().skipSources(CXFModule.class);
 	}
 
 	/**
@@ -432,95 +404,95 @@ public abstract class CXFModule extends AbstractModule {
 	}
 
 	protected final void handleRequest(Class<? extends RequestHandler> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void handleRequest(Key<? extends RequestHandler> key) {
-		doBind(key);
+		provide(key);
 	}
 
 	protected final void handleRequest(
 			TypeLiteral<? extends RequestHandler> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void handleResponse(Class<? extends ResponseHandler> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void handleResponse(Key<? extends ResponseHandler> key) {
-		doBind(key);
+		provide(key);
 	}
 
 	protected final void handleResponse(
 			TypeLiteral<? extends ResponseHandler> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void mapExceptions(Class<? extends ExceptionMapper<?>> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void mapExceptions(Key<? extends ExceptionMapper<?>> key) {
-		doBind(key);
+		provide(key);
 	}
 
 	protected final void mapExceptions(
 			TypeLiteral<? extends ExceptionMapper<?>> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void provide(Class<?> type) {
-		doBind(type);
+		provide(Key.get(type));
 	}
 
 	protected final void provide(Key<?> key) {
-		doBind(key);
+		providers.addBinding().to(key).in(SINGLETON);
 	}
 
 	protected final void provide(TypeLiteral<?> type) {
-		doBind(type);
+		provide(Key.get(type));
 	}
 
 	protected final void readBody(Class<? extends MessageBodyReader<?>> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void readBody(Key<? extends MessageBodyReader<?>> key) {
-		doBind(key);
+		provide(key);
 	}
 
 	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void readBody(
 			TypeLiteral<T> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void writeAndReadBody(
 			Class<T> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void writeAndReadBody(
 			Key<T> key) {
-		doBind(key);
+		provide(key);
 	}
 
 	protected final void writeAndReadBody(
 			TypeLiteral<? extends MessageBodyReader<?>> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void writeBody(Class<? extends MessageBodyWriter<?>> type) {
-		doBind(type);
+		provide(type);
 	}
 
 	protected final void writeBody(Key<? extends MessageBodyWriter<?>> key) {
-		doBind(key);
+		provide(key);
 	}
 
 	protected final void writeBody(
 			TypeLiteral<? extends MessageBodyWriter<?>> type) {
-		doBind(type);
+		provide(type);
 	}
 
 }

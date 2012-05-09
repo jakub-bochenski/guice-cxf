@@ -15,6 +15,8 @@
  */
 package com.google.code.inject.jaxrs;
 
+import static com.google.inject.Scopes.NO_SCOPE;
+
 import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
 import org.apache.cxf.message.Message;
 
@@ -33,7 +35,7 @@ class GuicePerRequestResourceProvider<T> implements ResourceProvider {
 	protected GuicePerRequestResourceProvider(BindingProvider<T> binding,
 			Provider<T> provider) {
 		final Scope scope = binding.getScope();
-		if (null != scope)
+		if (NO_SCOPE != scope)
 			throw new ProvisionException("Invalid scope " + scope + " of "
 					+ binding.getKey());
 		this.actualType = binding.getActualType();
