@@ -77,7 +77,7 @@ import com.google.inject.multibindings.Multibinder;
  * <p>
  * Use <tt>publish()</tt> to register a resource class - a custom
  * <tt>ResourceProvider</tt> will be bound for each resource class. It's a
- * 'per-request' type and will get a new instance for each incoming request.
+ * 'per-message' type and will get a new instance for each incoming message.
  * </p>
  * <p>
  * Use <tt>serve()</tt> to configure server, e.g. set the root address.
@@ -209,7 +209,7 @@ public abstract class CXFModule extends AbstractModule {
 
 		@Override
 		public ServerConfigurationBuilder enableCustomScopes() {
-			binder().bindScope(CXFScopes.Request.class, CXFScopes.REQUEST);
+			binder().install(new CXFScopes.Module());
 			return this;
 		}
 

@@ -1,8 +1,10 @@
 package com.google.code.inject.jaxrs.scope;
 
+import static com.google.inject.internal.util.$Preconditions.checkState;
+import static java.lang.Thread.currentThread;
+import static java.util.Collections.singleton;
 import static org.apache.cxf.phase.Phase.INVOKE;
 
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
@@ -15,26 +17,25 @@ import org.apache.cxf.phase.AbstractPhaseInterceptor;
 import org.apache.cxf.phase.PhaseInterceptor;
 
 import com.google.inject.OutOfScopeException;
-import com.google.inject.internal.util.$Preconditions;
 
 public class GuiceInterceptorWrapper extends AbstractPhaseInterceptor<Message> {
 
 	static class Context {
-		final Message originalRequest;
+		final Message message;
+		final Message originalMessage;
 		volatile Thread owner;
-		final Message request;
 
-		Context(Message originalRequest, Message request) {
-			this.originalRequest = originalRequest;
-			this.request = request;
+		Context(Message originalMessage, Message message) {
+			super();
+			this.originalMessage = originalMessage;
+			this.message = message;
 		}
 
 		<T> T call(Callable<T> callable) throws Exception {
 			final Thread oldOwner = owner;
-			final Thread newOwner = Thread.currentThread();
-			$Preconditions
-					.checkState(oldOwner == null || oldOwner == newOwner,
-							"Trying to transfer request scope but original scope is still active");
+			final Thread newOwner = currentThread();
+			checkState(oldOwner == null || oldOwner == newOwner,
+					"Trying to transfer message scope but original scope is still active");
 			owner = newOwner;
 			final Context previous = localContext.get();
 			localContext.set(this);
@@ -46,12 +47,12 @@ public class GuiceInterceptorWrapper extends AbstractPhaseInterceptor<Message> {
 			}
 		}
 
-		public Message getOriginalRequest() {
-			return originalRequest;
+		public Message getMessage() {
+			return message;
 		}
 
-		public Message getRequest() {
-			return request;
+		public Message getOriginalMessage() {
+			return originalMessage;
 		}
 	}
 
@@ -62,16 +63,16 @@ public class GuiceInterceptorWrapper extends AbstractPhaseInterceptor<Message> {
 		if (context == null) {
 			throw new OutOfScopeException(
 					"Cannot access scoped object. Either we"
-							+ " are not currently inside a request, or you may"
+							+ " are not currently inside a message, or you may"
 							+ " have forgotten to apply "
 							+ GuiceInterceptorWrapper.class.getName()
-							+ " as an interceptor for this request.");
+							+ " as an interceptor for this endpoint.");
 		}
 		return context;
 	}
 
-	static Message getOriginalRequest() {
-		return getContext().getOriginalRequest();
+	static Message getOriginalMessage() {
+		return getContext().getOriginalMessage();
 	}
 
 	private final PhaseInterceptor<Message> delegate;
@@ -82,25 +83,26 @@ public class GuiceInterceptorWrapper extends AbstractPhaseInterceptor<Message> {
 
 	public GuiceInterceptorWrapper(PhaseInterceptor<Message> delegate) {
 		super(INVOKE);
-		setBefore(Collections.singleton(ServiceInvokerInterceptor.class
-				.getName()));
+		setBefore(singleton(ServiceInvokerInterceptor.class.getName()));
 		this.delegate = delegate;
 	}
 
 	@Override
 	public void handleMessage(final Message request) throws Fault {
+		// remove delegate from chain 
 		final InterceptorChain chain = request.getInterceptorChain();
 		final Iterator<Interceptor<? extends Message>> it = chain.iterator();
 		while (it.hasNext()) {
 			final Interceptor<? extends Message> next = it.next();
-			if (next instanceof ServiceInvokerInterceptor) {
+			if (delegate.getClass().isInstance(next)) {
 				chain.remove(next);
 			}
 		}
 
+		// process in scope
 		final Context previous = localContext.get();
 		final Message originalRequest = (previous != null) ? previous
-				.getOriginalRequest() : request;
+				.getOriginalMessage() : request;
 
 		try {
 			new Context(originalRequest, request).call(new Callable<Void>() {

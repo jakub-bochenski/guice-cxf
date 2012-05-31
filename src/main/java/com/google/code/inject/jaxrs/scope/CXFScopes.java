@@ -1,125 +1,174 @@
 package com.google.code.inject.jaxrs.scope;
 
-import java.lang.annotation.ElementType;
+import static com.google.code.inject.jaxrs.scope.CXFScopes.Marker.NULL;
+import static com.google.code.inject.jaxrs.scope.GuiceInterceptorWrapper.getOriginalMessage;
+import static com.google.code.inject.jaxrs.util.ScopeUtils.isCircularProxy;
+import static com.google.inject.internal.util.$Preconditions.checkArgument;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.util.Collections.unmodifiableSet;
+
 import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Request;
+import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.UriInfo;
+import javax.ws.rs.ext.Providers;
+
+import org.apache.cxf.jaxrs.ext.MessageContext;
+import org.apache.cxf.jaxrs.ext.MessageContextImpl;
+import org.apache.cxf.message.Exchange;
 import org.apache.cxf.message.Message;
+import org.apache.cxf.service.Service;
 
 import com.google.code.inject.jaxrs.util.ScopeUtils;
+import com.google.inject.AbstractModule;
 import com.google.inject.Binding;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.OutOfScopeException;
 import com.google.inject.Provider;
+import com.google.inject.Provides;
 import com.google.inject.Scope;
 import com.google.inject.ScopeAnnotation;
-import com.google.inject.internal.util.$Preconditions;
 
 public class CXFScopes {
-	@Target({ ElementType.TYPE, ElementType.METHOD })
-	@Retention(RetentionPolicy.RUNTIME)
-	@ScopeAnnotation
-	public @interface Request {
+	/**
+	 * Binds the scope annotation and provides @Context instances
+	 */
+	public static class Module extends AbstractModule {
+
+		@SuppressWarnings("unchecked")
+		@Override
+		protected void configure() {
+			bindScope(RequestScope.class, REQUEST);
+
+			for (final Key<?> key : MESSAGE_CONTEXT_KEYS) {
+				bind(key).toProvider(DUMMY_PROVIDER).in(REQUEST);
+			}
+
+		}
+
+		@Provides
+		@RequestScope
+		protected MessageContext provideMessageContext(Message m) {
+			return new MessageContextImpl(m);
+		}
+
+		@Provides
+		@RequestScope
+		protected Exchange provideExchange(Message m) {
+			return m.getExchange();
+		}
+
+		@Provides
+		@RequestScope
+		protected Service provideService(MessageContext messageContext) {
+			return (Service) messageContext
+					.getContextualProperty(Service.class);
+		}
+
+		@Provides
+		@RequestScope
+		protected HttpHeaders provideHttpHeaders(MessageContext messageContext) {
+			return messageContext.getHttpHeaders();
+		}
+
+		@Provides
+		@RequestScope
+		protected Providers provideProviders(MessageContext messageContext) {
+			return messageContext.getProviders();
+		}
+
+		@Provides
+		@RequestScope
+		protected UriInfo provideUriInfo(MessageContext messageContext) {
+			return messageContext.getUriInfo();
+		}
+
+		@Provides
+		@RequestScope
+		protected Request provideRequest(MessageContext messageContext) {
+			return messageContext.getRequest();
+		}
+
+		@Provides
+		@RequestScope
+		protected SecurityContext provideSecurityContext(
+				MessageContext messageContext) {
+			return messageContext.getSecurityContext();
+		}
+
 	}
+
+	@Target({ TYPE, METHOD })
+	@Retention(RUNTIME)
+	@ScopeAnnotation
+	public @interface RequestScope {
+	}
+
+	/**
+	 * Dummy marker to bind {@value #MESSAGE_CONTEXT_KEYS} to
+	 */
+	@SuppressWarnings("rawtypes")
+	private static final Provider DUMMY_PROVIDER = new Provider<Void>() {
+
+		@Override
+		public Void get() {
+			throw new OutOfScopeException("This should never happen -- check "
+					+ CXFScopes.class + ".MESSAGE_CONTEXT_KEYS");
+		}
+	};
 
 	private CXFScopes() {
 	}
 
 	/**
-	 * Keys bound in request-scope which are handled directly by
-	 * GuiceInterceptorWrapper.
+	 * This keys will be retrieved from message via
+	 * {@link #getKeyFromMessage(Message, Key)}
 	 */
-	private static final Set<Key<?>> REQUEST_CONTEXT_KEYS = Collections
-			.unmodifiableSet(new HashSet<Key<?>>(Arrays.<Key<?>> asList(
-			//					Key.get(HttpServletRequest.class),
-			//					Key.get(HttpServletResponse.class),
-			//					new Key<Map<String, String[]>>(RequestParameters.class) {}
-					)));
+	private static final Set<Key<?>> MESSAGE_CONTEXT_KEYS = unmodifiableSet(new HashSet<Key<?>>(
+			Arrays.<Key<?>> asList(Key.get(Message.class))));
 
-	/**
-	 * A threadlocal scope map for non-http request scopes. The {@link #REQUEST}
-	 * scope falls back to this scope map if no http request is available, and
-	 * requires {@link #scopeRequest} to be called as an alertnative.
-	 */
-	private static final ThreadLocal<Context> requestScopeContext = new ThreadLocal<Context>();
-
-	/** A sentinel attribute value representing null. */
-	enum NullObject {
-		INSTANCE
+	/** Marker for @Nullable providers */
+	enum Marker {
+		NULL
 	}
 
 	/**
-	 * CXF request scope.
+	 * CXF message scope.
 	 */
 	public static final Scope REQUEST = new Scope() {
 		public <T> Provider<T> scope(final Key<T> key, final Provider<T> creator) {
 			final String name = key.toString();
 			return new Provider<T>() {
 				public T get() {
-					// Check if the alternate request scope should be used, if no HTTP
-					// request is in progress.
-					if (null == GuiceInterceptorWrapper.localContext.get()) {
 
-						// We don't need to synchronize on the scope map
-						// unlike the HTTP request because we're the only ones who have
-						// a reference to it, and it is only available via a threadlocal.
-						final Context context = requestScopeContext.get();
-						if (null != context) {
-							@SuppressWarnings("unchecked")
-							T t = (T) context.map.get(name);
+					final Message message = getOriginalMessage();
+					synchronized (message) {
 
-							// Accounts for @Nullable providers.
-							if (NullObject.INSTANCE == t) {
-								return null;
-							}
+						if (MESSAGE_CONTEXT_KEYS.contains(key))
+							return getKeyFromMessage(message, key);
 
-							if (t == null) {
-								t = creator.get();
-								if (!ScopeUtils.isCircularProxy(t)) {
-									// Store a sentinel for provider-given null values.
-									context.map.put(name, t != null ? t
-											: NullObject.INSTANCE);
-								}
-							}
-
-							return t;
-						} // else: fall into normal request scope and out of scope exception is thrown.
-					}
-
-					// Always synchronize and get/set attributes on the underlying request
-					// object since Filters may wrap the request and change the value of
-					// {@code GuiceInterceptorWrapper.getRequest()}.
-					//
-					// This _correctly_ throws up if the thread is out of scope.
-					final Message request = GuiceInterceptorWrapper
-							.getOriginalRequest();
-					if (REQUEST_CONTEXT_KEYS.contains(key)) {
-						// Don't store these keys as attributes, since they are handled by
-						// GuiceInterceptorWrapper itself.
-						return creator.get();
-					}
-					synchronized (request) {
-						final Object obj = request.get(name);
-						if (NullObject.INSTANCE == obj) {
+						final Object obj = message.get(name);
+						if (NULL == obj)
 							return null;
-						}
+
 						@SuppressWarnings("unchecked")
 						T t = (T) obj;
 						if (t == null) {
 							t = creator.get();
-							if (!ScopeUtils.isCircularProxy(t)) {
-								request.put(name, (t != null) ? t
-										: NullObject.INSTANCE);
+							if (!isCircularProxy(t)) {
+								message.put(name, (t != null) ? t : NULL);
 							}
 						}
+
 						return t;
 					}
 				}
@@ -133,102 +182,44 @@ public class CXFScopes {
 
 		@Override
 		public String toString() {
-			return "ServletScopes.REQUEST";
+			return "CXFScopes.REQUEST";
 		}
 	};
 
 	/**
-	 * Returns true if {@code binding} is request-scoped. If the binding is a
+	 * Retrieve an existing instance from message.
+	 * <p>
+	 * This method will be called for all keys in {@link #MESSAGE_CONTEXT_KEYS}
+	 * 
+	 * @param message
+	 *            request message
+	 * @param key
+	 *            key to retrieve
+	 * @return instance of T, never null
+	 */
+	private static <T> T getKeyFromMessage(Message message, Key<T> key) {
+		checkArgument(key.getAnnotationType() == null,
+				"Annotated keys not allowed");
+		final Class<? super T> rt = key.getTypeLiteral().getRawType();
+
+		if (Message.class.equals(rt)) {
+			@SuppressWarnings("unchecked")
+			final T t = (T) message;
+			return t;
+		}
+
+		throw new UnsupportedOperationException("Key " + key);
+	}
+
+	/**
+	 * Returns true if {@code binding} is message-scoped. If the binding is a
 	 * {@link com.google.inject.spi.LinkedKeyBinding linked key binding} and
 	 * belongs to an injector (i. e. it was retrieved via
 	 * {@link Injector#getBinding Injector.getBinding()}), then this method will
-	 * also return true if the target binding is request-scoped.
+	 * also return true if the target binding is message-scoped.
 	 */
 	public static boolean isRequestScoped(Binding<?> binding) {
-		return ScopeUtils.isScoped(binding, REQUEST, Request.class);
+		return ScopeUtils.isScoped(binding, REQUEST, RequestScope.class);
 	}
 
-	/**
-	 * Scopes the given callable inside a request scope.
-	 * 
-	 * @param callable
-	 *            code to be executed which depends on the request scope.
-	 *            Typically in another thread, but not necessarily so.
-	 * @param seedMap
-	 *            the initial set of scoped instances for Guice to seed the
-	 *            request scope with. To seed a key with null, use {@code null}
-	 *            as the value.
-	 * @return a callable that when called will run inside the a request scope
-	 *         that exposes the instances in the {@code seedMap} as scoped keys.
-	 * @since 3.0
-	 */
-	public static <T> Callable<T> scopeRequest(final Callable<T> callable,
-			Map<Key<?>, Object> seedMap) {
-		$Preconditions
-				.checkArgument(null != seedMap,
-						"Seed map cannot be null, try passing in Collections.emptyMap() instead.");
-
-		// Copy the seed values into our local scope map.
-		final Context context = new Context();
-		for (final Map.Entry<Key<?>, Object> entry : seedMap.entrySet()) {
-			final Object value = validateAndCanonicalizeValue(entry.getKey(),
-					entry.getValue());
-			context.map.put(entry.getKey().toString(), value);
-		}
-
-		return new Callable<T>() {
-			public T call() throws Exception {
-				$Preconditions
-						.checkState(
-								null == GuiceInterceptorWrapper.localContext
-										.get(),
-								"An HTTP request is already in progress, cannot scope a new request in this thread.");
-				$Preconditions
-						.checkState(
-								null == requestScopeContext.get(),
-								"A request scope is already in progress, cannot scope a new request in this thread.");
-				return context.call(callable);
-			}
-		};
-	}
-
-	/**
-	 * Validates the key and object, ensuring the value matches the key type,
-	 * and canonicalizing null objects to the null sentinel.
-	 */
-	private static Object validateAndCanonicalizeValue(Key<?> key, Object object) {
-		if (object == null || object == NullObject.INSTANCE) {
-			return NullObject.INSTANCE;
-		}
-
-		if (!key.getTypeLiteral().getRawType().isInstance(object)) {
-			throw new IllegalArgumentException("Value[" + object + "] of type["
-					+ object.getClass().getName()
-					+ "] is not compatible with key[" + key + "]");
-		}
-
-		return object;
-	}
-
-	private static class Context {
-		final Map<String, Object> map = new HashMap<String, Object>();
-		volatile Thread owner;
-
-		<T> T call(Callable<T> callable) throws Exception {
-			final Thread oldOwner = owner;
-			final Thread newOwner = Thread.currentThread();
-			$Preconditions
-					.checkState(oldOwner == null || oldOwner == newOwner,
-							"Trying to transfer request scope but original scope is still active");
-			owner = newOwner;
-			final Context previous = requestScopeContext.get();
-			requestScopeContext.set(this);
-			try {
-				return callable.call();
-			} finally {
-				owner = oldOwner;
-				requestScopeContext.set(previous);
-			}
-		}
-	}
 }
