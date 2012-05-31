@@ -35,6 +35,7 @@ import org.apache.cxf.service.invoker.Invoker;
 import com.google.code.inject.jaxrs.internal.DefaultInvoker;
 import com.google.code.inject.jaxrs.internal.JaxRsProvider;
 import com.google.code.inject.jaxrs.internal.SubresourceInterceptor;
+import com.google.code.inject.jaxrs.scope.CXFScopes;
 import com.google.code.inject.jaxrs.util.BindingProvider;
 import com.google.code.inject.jaxrs.util.ParametrizedType;
 import com.google.inject.AbstractModule;
@@ -203,6 +204,12 @@ public abstract class CXFModule extends AbstractModule {
 
 		public ServerConfigurationBuilder withSubresourcesInjection() {
 			this.subresourcesInjection = true;
+			return enableCustomScopes();
+		}
+
+		@Override
+		public ServerConfigurationBuilder enableCustomScopes() {
+			binder().bindScope(CXFScopes.Request.class, CXFScopes.REQUEST);
 			return this;
 		}
 
@@ -241,11 +248,20 @@ public abstract class CXFModule extends AbstractModule {
 		ServerConfigurationBuilder withStaticResourceResolution();
 
 		/**
-		 * Enable AOP based sub-resource injection
+		 * Enable AOP based sub-resource injection.
+		 * <p>
+		 * Implies {@link #enableCustomScopes()}
 		 * 
 		 * @return self
 		 */
 		ServerConfigurationBuilder withSubresourcesInjection();
+
+		/**
+		 * Enable CXF-specifix scopes
+		 * 
+		 * @return self
+		 */
+		ServerConfigurationBuilder enableCustomScopes();
 
 	}
 

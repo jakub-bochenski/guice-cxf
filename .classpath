@@ -8,5 +8,6 @@
 	<classpathentry kind="lib" path="dep/main/java/cxf-2.5.2.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/javax.inject.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/aopalliance.jar"/>
+	<classpathentry kind="lib" path="dep/main/java/xmlschema-core-2.0.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

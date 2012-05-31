@@ -15,8 +15,6 @@
  */
 package com.google.code.inject.jaxrs.util;
 
-import static com.google.inject.Scopes.NO_SCOPE;
-import static com.google.inject.Scopes.SINGLETON;
 import static com.google.inject.internal.util.$Preconditions.checkArgument;
 import static com.google.inject.internal.util.$Preconditions.checkState;
 
@@ -29,24 +27,16 @@ import com.google.inject.Binding;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.Key;
-import com.google.inject.Provider;
 import com.google.inject.ProvisionException;
 import com.google.inject.Scope;
-import com.google.inject.multibindings.Multibinder;
 import com.google.inject.spi.ConstructorBinding;
-import com.google.inject.spi.ConvertedConstantBinding;
-import com.google.inject.spi.DefaultBindingScopingVisitor;
 import com.google.inject.spi.DefaultBindingTargetVisitor;
 import com.google.inject.spi.LinkedKeyBinding;
 import com.google.inject.spi.ProviderBinding;
-import com.google.inject.spi.ProviderInstanceBinding;
 import com.google.inject.spi.UntargettedBinding;
-import com.google.inject.util.Providers;
 
 public class BindingProvider<T> {
 
-	private static final Class<?> PROVIDERS_OF_CLASS = Providers.of(null)
-			.getClass();
 	private final Key<T> key;
 	private Class<?> actualType;
 	private Scope scope;
@@ -70,7 +60,7 @@ public class BindingProvider<T> {
 
 	protected void setBinding(final Binding<? extends T> binding,
 			final Map<Class<? extends Annotation>, Scope> scopeBindings) {
-		this.scope = scopeOfBinding(binding, scopeBindings);
+		this.scope = ScopeUtils.scopeOfBinding(binding, scopeBindings);
 
 		this.actualType = binding
 				.acceptTargetVisitor(new DefaultBindingTargetVisitor<T, Class<?>>() {
@@ -113,57 +103,6 @@ public class BindingProvider<T> {
 					protected Class<?> visitOther(Binding<? extends T> binding) {
 						throw new ProvisionException(
 								"Unable to resolve target class for " + binding);
-					}
-				});
-	}
-
-	public static Scope scopeOfBinding(final Binding<?> binding,
-			final Map<Class<? extends Annotation>, Scope> scopeBindings) {
-
-		if (binding instanceof ProviderInstanceBinding<?>) {
-			final Provider<?> providerInstance = ((ProviderInstanceBinding<?>) binding)
-					.getProviderInstance();
-
-			if (providerInstance instanceof Multibinder) {
-				// multibinder scope is effectively equal to the scope of it's member bindings				
-				return null;
-			}
-
-			if (PROVIDERS_OF_CLASS.equals(providerInstance.getClass()))
-				return SINGLETON;
-
-		}
-
-		if (binding instanceof ConvertedConstantBinding) {
-			return SINGLETON;
-		}
-
-		return binding
-				.acceptScopingVisitor(new DefaultBindingScopingVisitor<Scope>() {
-					@Override
-					public Scope visitEagerSingleton() {
-						return SINGLETON;
-					}
-
-					@Override
-					public Scope visitNoScoping() {
-						return NO_SCOPE;
-					}
-
-					@Override
-					protected Scope visitOther() {
-						return null;
-					}
-
-					@Override
-					public Scope visitScope(Scope scope) {
-						return scope;
-					}
-
-					@Override
-					public Scope visitScopeAnnotation(
-							Class<? extends Annotation> scopeAnnotation) {
-						return scopeBindings.get(scopeAnnotation);
 					}
 				});
 	}
