@@ -15,9 +15,11 @@
  */
 package com.google.code.inject.jaxrs;
 
+import static com.google.code.inject.jaxrs.util.Matchers.resourceMethod;
 import static com.google.inject.Scopes.SINGLETON;
 import static com.google.inject.internal.util.$Preconditions.checkNotNull;
 import static com.google.inject.internal.util.$Preconditions.checkState;
+import static com.google.inject.matcher.Matchers.any;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
 
 import java.lang.reflect.Type;
@@ -43,7 +45,6 @@ import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
-import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
 
 /**
@@ -293,8 +294,7 @@ public abstract class CXFModule extends AbstractModule {
 
 			if (config.subresourcesInjection) {
 				final SubresourceInterceptor interceptor = new SubresourceInterceptor();
-				bindInterceptor(Matchers.any(),
-						Matchers.annotatedWith(InjectedResource.class),
+				bindInterceptor(any(), resourceMethod(Injected.class),
 						interceptor);
 
 				requestInjection(interceptor);
