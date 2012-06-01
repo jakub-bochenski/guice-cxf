@@ -98,8 +98,12 @@ class JaxRsServerFactoryBeanProvider implements
 
 		bean.setProviders(new ArrayList<Object>(providers));
 
-		bean.setInInterceptors(new ArrayList<Interceptor<?>>(inInterceptors));
-		bean.setOutInterceptors(new ArrayList<Interceptor<?>>(outInterceptors));
+		if (!inInterceptors.isEmpty())
+			bean.setInInterceptors(new ArrayList<Interceptor<?>>(inInterceptors));
+
+		if (!outInterceptors.isEmpty())
+			bean.setOutInterceptors(new ArrayList<Interceptor<?>>(
+					outInterceptors));
 
 		if (!isDefault(invoker))
 			bean.setInvoker(invoker);
