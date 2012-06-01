@@ -21,6 +21,7 @@ import static com.google.inject.internal.util.$Preconditions.checkNotNull;
 import static com.google.inject.internal.util.$Preconditions.checkState;
 import static com.google.inject.matcher.Matchers.any;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
+import static com.google.inject.name.Names.named;
 
 import java.lang.reflect.Type;
 
@@ -28,6 +29,7 @@ import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.MessageBodyWriter;
 
+import org.apache.cxf.interceptor.Interceptor;
 import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.ext.RequestHandler;
 import org.apache.cxf.jaxrs.ext.ResponseHandler;
@@ -38,6 +40,7 @@ import com.google.code.inject.jaxrs.internal.DefaultInvoker;
 import com.google.code.inject.jaxrs.internal.JaxRsProvider;
 import com.google.code.inject.jaxrs.internal.SubresourceInterceptor;
 import com.google.code.inject.jaxrs.scope.CXFScopes;
+import com.google.code.inject.jaxrs.scope.GuiceInterceptorWrapper;
 import com.google.code.inject.jaxrs.util.BindingProvider;
 import com.google.code.inject.jaxrs.util.ParametrizedType;
 import com.google.inject.AbstractModule;
@@ -175,15 +178,62 @@ import com.google.inject.multibindings.Multibinder;
  */
 public abstract class CXFModule extends AbstractModule {
 
+	protected final class InterceptorBuilder {
+		private String direction;
+
+		public InterceptorBuilder inMessages() {
+			setDirection(DIRECTION_IN);
+			return this;
+		}
+
+		public InterceptorBuilder outMessages() {
+			setDirection(DIRECTION_OUT);
+			return this;
+		}
+
+		private void setDirection(String string) {
+			checkState(null == this.direction, "Direction already set");
+			this.direction = string;
+		}
+
+		public void with(Class<? extends Interceptor<?>> type) {
+			with(Key.get(type));
+		}
+
+		public void with(Key<? extends Interceptor<?>> key) {
+			checkState(null != direction, "Direction must be set");
+
+			if (DIRECTION_IN.equals(direction))
+				inInterceptors.addBinding().to(key);
+			else if (DIRECTION_OUT.equals(direction))
+				outInterceptors.addBinding().to(key);
+		}
+
+		public void with(TypeLiteral<? extends Interceptor<?>> type) {
+			with(Key.get(type));
+		}
+
+	}
+
 	private final class ServerConfig implements ServerConfiguration,
 			ServerConfigurationBuilder {
 		private String address = "/";
 		private boolean staticResourceResolution = false;
-		private boolean subresourcesInjection = false;
+		private boolean scopesEnabled = false;
+		private boolean subinjectionEnabled = false;
 
 		@Override
 		public ServerConfigurationBuilder atAddress(String address) {
 			this.address = address;
+			return this;
+		}
+
+		@Override
+		public ServerConfigurationBuilder enableCustomScopes() {
+			checkState(!scopesEnabled, "Custom scopes already enabled");
+			binder().install(new CXFScopes.Module());
+			inInterceptors.addBinding().to(GuiceInterceptorWrapper.class);
+			scopesEnabled = true;
 			return this;
 		}
 
@@ -204,16 +254,15 @@ public abstract class CXFModule extends AbstractModule {
 		}
 
 		public ServerConfigurationBuilder withSubresourcesInjection() {
-			this.subresourcesInjection = true;
+			checkState(!subinjectionEnabled,
+					"Subresource injection already enabled");
+			final SubresourceInterceptor interceptor = new SubresourceInterceptor();
+			bindInterceptor(any(), resourceMethod(Injected.class), interceptor);
+
+			requestInjection(interceptor);
+			subinjectionEnabled = true;
 			return enableCustomScopes();
 		}
-
-		@Override
-		public ServerConfigurationBuilder enableCustomScopes() {
-			binder().install(new CXFScopes.Module());
-			return this;
-		}
-
 	}
 
 	/**
@@ -242,6 +291,13 @@ public abstract class CXFModule extends AbstractModule {
 		ServerConfigurationBuilder atAddress(String address);
 
 		/**
+		 * Enable CXF-specifix scopes
+		 * 
+		 * @return self
+		 */
+		ServerConfigurationBuilder enableCustomScopes();
+
+		/**
 		 * Use static resource resolution
 		 * 
 		 * @return self
@@ -257,48 +313,54 @@ public abstract class CXFModule extends AbstractModule {
 		 */
 		ServerConfigurationBuilder withSubresourcesInjection();
 
-		/**
-		 * Enable CXF-specifix scopes
-		 * 
-		 * @return self
-		 */
-		ServerConfigurationBuilder enableCustomScopes();
-
 	}
+
+	static final String DIRECTION_IN = "in";
+	static final String DIRECTION_OUT = "out";
 
 	private ServerConfig config;
 
 	private boolean customInvoker;
+
+	private Multibinder<Interceptor<?>> inInterceptors;
+	private Multibinder<Interceptor<?>> outInterceptors;
 
 	private Multibinder<Object> providers;
 
 	private Multibinder<ResourceProvider> resourceProviders;
 
 	@Override
+	protected Binder binder() {
+		return super.binder().skipSources(CXFModule.class);
+	}
+
+	@Override
 	protected final void configure() {
 		checkState(resourceProviders == null, "Re-entry is not allowed.");
+		checkState(inInterceptors == null, "Re-entry is not allowed.");
+		checkState(outInterceptors == null, "Re-entry is not allowed.");
 		checkState(providers == null, "Re-entry is not allowed.");
 		checkState(config == null, "Re-entry is not allowed.");
 
 		resourceProviders = newSetBinder(binder(), ResourceProvider.class);
+		inInterceptors = newSetBinder(binder(),
+				new TypeLiteral<Interceptor<?>>() {
+				}, named(DIRECTION_IN));
+		outInterceptors = newSetBinder(binder(),
+				new TypeLiteral<Interceptor<?>>() {
+				}, named(DIRECTION_OUT));
 		providers = newSetBinder(binder(), Object.class, JaxRsProvider.class);
+
 		config = new ServerConfig();
 		customInvoker = false;
 
 		try {
 			configureResources();
+
 			binder().bind(ServerConfiguration.class).toInstance(config);
 			binder().bind(JAXRSServerFactoryBean.class)
 					.toProvider(JaxRsServerFactoryBeanProvider.class)
 					.in(Singleton.class);
-
-			if (config.subresourcesInjection) {
-				final SubresourceInterceptor interceptor = new SubresourceInterceptor();
-				bindInterceptor(any(), resourceMethod(Injected.class),
-						interceptor);
-
-				requestInjection(interceptor);
-			}
 
 			if (!customInvoker)
 				binder().bind(Invoker.class).to(DefaultInvoker.class)
@@ -306,6 +368,9 @@ public abstract class CXFModule extends AbstractModule {
 
 		} finally {
 			resourceProviders = null;
+			inInterceptors = null;
+			outInterceptors = null;
+			outInterceptors = null;
 			providers = null;
 			config = null;
 		}
@@ -316,13 +381,34 @@ public abstract class CXFModule extends AbstractModule {
 	 */
 	protected abstract void configureResources();
 
-	/**
-	 * Configure server
-	 * 
-	 * @return configuration builder
-	 */
-	protected final ServerConfigurationBuilder serve() {
-		return this.config;
+	protected final void handleRequest(Class<? extends RequestHandler> type) {
+		provide(type);
+	}
+
+	protected final void handleRequest(Key<? extends RequestHandler> key) {
+		provide(key);
+	}
+
+	protected final void handleRequest(
+			TypeLiteral<? extends RequestHandler> type) {
+		provide(type);
+	}
+
+	protected final void handleResponse(Class<? extends ResponseHandler> type) {
+		provide(type);
+	}
+
+	protected final void handleResponse(Key<? extends ResponseHandler> key) {
+		provide(key);
+	}
+
+	protected final void handleResponse(
+			TypeLiteral<? extends ResponseHandler> type) {
+		provide(type);
+	}
+
+	protected final InterceptorBuilder intercept() {
+		return new InterceptorBuilder();
 	}
 
 	/**
@@ -360,6 +446,31 @@ public abstract class CXFModule extends AbstractModule {
 		invokeVia(Key.get(type));
 	}
 
+	protected final void mapExceptions(Class<? extends ExceptionMapper<?>> type) {
+		provide(type);
+	}
+
+	protected final void mapExceptions(Key<? extends ExceptionMapper<?>> key) {
+		provide(key);
+	}
+
+	protected final void mapExceptions(
+			TypeLiteral<? extends ExceptionMapper<?>> type) {
+		provide(type);
+	}
+
+	protected final void provide(Class<?> type) {
+		provide(Key.get(type));
+	}
+
+	protected final void provide(Key<?> key) {
+		providers.addBinding().to(key).in(SINGLETON);
+	}
+
+	protected final void provide(TypeLiteral<?> type) {
+		provide(Key.get(type));
+	}
+
 	/**
 	 * Bind a resource class
 	 * 
@@ -392,11 +503,6 @@ public abstract class CXFModule extends AbstractModule {
 		requestInjection(binding);
 	}
 
-	@Override
-	protected Binder binder() {
-		return super.binder().skipSources(CXFModule.class);
-	}
-
 	/**
 	 * Bind a resource class
 	 * 
@@ -419,57 +525,6 @@ public abstract class CXFModule extends AbstractModule {
 		publish(Key.get(type));
 	}
 
-	protected final void handleRequest(Class<? extends RequestHandler> type) {
-		provide(type);
-	}
-
-	protected final void handleRequest(Key<? extends RequestHandler> key) {
-		provide(key);
-	}
-
-	protected final void handleRequest(
-			TypeLiteral<? extends RequestHandler> type) {
-		provide(type);
-	}
-
-	protected final void handleResponse(Class<? extends ResponseHandler> type) {
-		provide(type);
-	}
-
-	protected final void handleResponse(Key<? extends ResponseHandler> key) {
-		provide(key);
-	}
-
-	protected final void handleResponse(
-			TypeLiteral<? extends ResponseHandler> type) {
-		provide(type);
-	}
-
-	protected final void mapExceptions(Class<? extends ExceptionMapper<?>> type) {
-		provide(type);
-	}
-
-	protected final void mapExceptions(Key<? extends ExceptionMapper<?>> key) {
-		provide(key);
-	}
-
-	protected final void mapExceptions(
-			TypeLiteral<? extends ExceptionMapper<?>> type) {
-		provide(type);
-	}
-
-	protected final void provide(Class<?> type) {
-		provide(Key.get(type));
-	}
-
-	protected final void provide(Key<?> key) {
-		providers.addBinding().to(key).in(SINGLETON);
-	}
-
-	protected final void provide(TypeLiteral<?> type) {
-		provide(Key.get(type));
-	}
-
 	protected final void readBody(Class<? extends MessageBodyReader<?>> type) {
 		provide(type);
 	}
@@ -481,6 +536,15 @@ public abstract class CXFModule extends AbstractModule {
 	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void readBody(
 			TypeLiteral<T> type) {
 		provide(type);
+	}
+
+	/**
+	 * Configure server
+	 * 
+	 * @return configuration builder
+	 */
+	protected final ServerConfigurationBuilder serve() {
+		return this.config;
 	}
 
 	protected final <T extends MessageBodyReader<?> & MessageBodyWriter<?>> void writeAndReadBody(
