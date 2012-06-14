@@ -23,6 +23,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.Map;
 
+import com.google.inject.Binder;
 import com.google.inject.Binding;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
@@ -121,5 +122,20 @@ public class BindingProvider<T> {
 	@Inject
 	void setInjector(final Injector injector) {
 		setBinding(injector.getBinding(key), injector.getScopeBindings());
+	}
+
+	public static <T> BindingProvider<T> provideBinding(final Binder binder,
+			final Key<T> key) {
+		final BindingProvider<T> binding = new BindingProvider<T>(key);
+		binder.requestInjection(binding);
+
+		binder.bind(new ParametrizedType(BindingProvider.class) {
+
+			public Type[] getActualTypeArguments() {
+				return new Type[] { key.getTypeLiteral().getType() };
+			}
+		}.asKey()).toInstance(binding);
+
+		return binding;
 	}
 }

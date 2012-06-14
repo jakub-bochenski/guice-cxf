@@ -15,8 +15,8 @@
  */
 package com.google.code.inject.jaxrs;
 
-import static com.google.code.inject.jaxrs.CXFModule.DIRECTION_IN;
-import static com.google.code.inject.jaxrs.CXFModule.DIRECTION_OUT;
+import static com.google.code.inject.jaxrs.CXFServerModule.DIRECTION_IN;
+import static com.google.code.inject.jaxrs.CXFServerModule.DIRECTION_OUT;
 import static com.google.code.inject.jaxrs.internal.DefaultInvoker.isDefault;
 import static org.apache.cxf.jaxrs.utils.ResourceUtils.isValidResourceClass;
 
@@ -33,7 +33,7 @@ import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.lifecycle.ResourceProvider;
 import org.apache.cxf.service.invoker.Invoker;
 
-import com.google.code.inject.jaxrs.CXFModule.ServerConfiguration;
+import com.google.code.inject.jaxrs.CXFServerModule.ServerConfiguration;
 import com.google.code.inject.jaxrs.internal.JaxRsProvider;
 import com.google.inject.Inject;
 import com.google.inject.ProvisionException;

@@ -15,6 +15,7 @@
  */
 package com.google.code.inject.jaxrs;
 
+import static com.google.code.inject.jaxrs.util.BindingProvider.provideBinding;
 import static com.google.code.inject.jaxrs.util.Matchers.resourceMethod;
 import static com.google.inject.Scopes.SINGLETON;
 import static com.google.inject.internal.util.$Preconditions.checkNotNull;
@@ -41,7 +42,6 @@ import com.google.code.inject.jaxrs.internal.JaxRsProvider;
 import com.google.code.inject.jaxrs.internal.SubresourceInterceptor;
 import com.google.code.inject.jaxrs.scope.CXFScopes;
 import com.google.code.inject.jaxrs.scope.GuiceInterceptorWrapper;
-import com.google.code.inject.jaxrs.util.BindingProvider;
 import com.google.code.inject.jaxrs.util.ParametrizedType;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
@@ -150,7 +150,7 @@ import com.google.inject.multibindings.Multibinder;
  * 
  * <h3>Bindings</h3>
  * 
- * The most important binding provided by the CXFModule is the
+ * The most important binding provided by the CXFServerModule is the
  * <tt>JAXRSServerFactoryBean</tt>. You can use it to easily create a server by
  * doing <tt>injector.getInstance(JAXRSServerFactoryBean.class).create()</tt>
  * </p>
@@ -176,7 +176,7 @@ import com.google.inject.multibindings.Multibinder;
  * of business classes are created during binding.
  * </p>
  */
-public abstract class CXFModule extends AbstractModule {
+public abstract class CXFServerModule extends AbstractModule {
 
 	protected final class InterceptorBuilder {
 		private String direction;
@@ -331,7 +331,7 @@ public abstract class CXFModule extends AbstractModule {
 
 	@Override
 	protected Binder binder() {
-		return super.binder().skipSources(CXFModule.class);
+		return super.binder().skipSources(CXFServerModule.class);
 	}
 
 	@Override
@@ -492,15 +492,7 @@ public abstract class CXFModule extends AbstractModule {
 
 		resourceProviders.addBinding().to(providerKey).in(Singleton.class);
 
-		final BindingProvider<T> binding = new BindingProvider<T>(resourceKey);
-
-		binder().bind(new ParametrizedType(BindingProvider.class) {
-
-			public Type[] getActualTypeArguments() {
-				return arguments;
-			}
-		}.asKey()).toInstance(binding);
-		requestInjection(binding);
+		provideBinding(binder(), resourceKey);
 	}
 
 	/**
