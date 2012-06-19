@@ -39,6 +39,7 @@ import com.google.inject.spi.ConstructorBinding;
 import com.google.inject.spi.ConvertedConstantBinding;
 import com.google.inject.spi.DefaultBindingTargetVisitor;
 import com.google.inject.spi.Dependency;
+import com.google.inject.spi.ExposedBinding;
 import com.google.inject.spi.InstanceBinding;
 import com.google.inject.spi.LinkedKeyBinding;
 import com.google.inject.spi.ProviderBinding;
@@ -167,6 +168,12 @@ public class ScopeValidator {
 					}
 
 					@Override
+					public Iterable<Dependency<?>> visit(
+							ExposedBinding<? extends Object> b) {
+						return b.getDependencies();
+					}
+
+					@Override
 					protected Iterable<Dependency<?>> visitOther(
 							Binding<? extends Object> binding) {
 						logger.warning("Unable to resolve dependencies for "
@@ -225,6 +232,18 @@ public class ScopeValidator {
 			final LinkedKeyBinding<?> lkb = (LinkedKeyBinding<?>) dependencyBinding;
 			checkDependency(injector, dependencyBinding, scope,
 					Dependency.get(lkb.getLinkedKey()));
+			return;
+		}
+
+		// this is wrong
+		if (dependencyBinding instanceof ExposedBinding) {
+			logger.warning("Exposed bindings are not checked.\n"
+					+ formatBinding(binding) + " -> "
+					+ formatBinding(dependencyBinding));
+			final ExposedBinding<?> eb = (ExposedBinding<?>) dependencyBinding;
+			for (final Dependency<?> dep : eb.getDependencies()) {
+				checkDependency(injector, dependencyBinding, scope, dep);
+			}
 			return;
 		}
 
