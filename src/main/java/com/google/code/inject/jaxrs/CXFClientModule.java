@@ -27,6 +27,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -110,7 +111,51 @@ public abstract class CXFClientModule implements Module {
 		}
 	}
 
+	private static final class ClientWrapper<T> implements InvocationHandler {
+		private final T resource;
+
+		public ClientWrapper(T resource) {
+			this.resource = resource;
+		}
+
+		@Override
+		public Object invoke(Object proxy, Method method, Object[] args)
+				throws Throwable {
+			try {
+				try {
+					return method.invoke(resource, args);
+				} catch (final InvocationTargetException e) {
+					throw e.getCause();
+				}
+			} catch (final ClientWebApplicationException e) {
+				final Class<?>[] types = method.getExceptionTypes();
+				for (final Class<?> type : types) {
+					final Throwable cause = e.getCause();
+					if (type.isInstance(cause))
+						throw cause;
+				}
+				throw e;
+			} catch (final ServerWebApplicationException e) {
+				// we need to wrap it otherwise CXF server might report them as this machine's fault
+				throw new RuntimeException("Remote server error", e);
+			}
+		}
+
+	}
+
+	public static <T> T unwrapClient(T object) {
+		final InvocationHandler handler = Proxy.getInvocationHandler(object);
+
+		if (handler instanceof ClientWrapper) {
+			@SuppressWarnings("unchecked")
+			final ClientWrapper<T> wrapper = (ClientWrapper<T>) handler;
+			return wrapper.resource;
+		}
+		return object;
+	}
+
 	public static class JAXRSClientProvider<T> implements Provider<T> {
+
 		private final JAXRSClientFactoryBean sf;
 		private final Class<T> type;
 
@@ -137,33 +182,7 @@ public abstract class CXFClientModule implements Module {
 			final T resource = sf.create(type);
 			return (T) newProxyInstance(
 					currentThread().getContextClassLoader(),
-					new Class<?>[] { type }, new InvocationHandler() {
-
-						@Override
-						public Object invoke(Object proxy, Method method,
-								Object[] args) throws Throwable {
-							try {
-								try {
-									return method.invoke(resource, args);
-								} catch (final InvocationTargetException e) {
-									throw e.getCause();
-								}
-							} catch (final ClientWebApplicationException e) {
-								final Class<?>[] types = method
-										.getExceptionTypes();
-								for (final Class<?> type : types) {
-									final Throwable cause = e.getCause();
-									if (type.isInstance(cause))
-										throw cause;
-								}
-								throw e;
-							} catch (final ServerWebApplicationException e) {
-								// we need to wrap it otherwise CXF server might report them as this machine's fault
-								throw new RuntimeException(
-										"Remote server error", e);
-							}
-						}
-					});
+					new Class<?>[] { type }, new ClientWrapper<T>(resource));
 		}
 	}
 
