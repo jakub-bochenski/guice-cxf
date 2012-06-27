@@ -43,9 +43,9 @@ import com.google.code.inject.jaxrs.internal.SubresourceInterceptor;
 import com.google.code.inject.jaxrs.scope.CXFScopes;
 import com.google.code.inject.jaxrs.scope.GuiceInterceptorWrapper;
 import com.google.code.inject.jaxrs.util.ParametrizedType;
-import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Key;
+import com.google.inject.Module;
 import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
@@ -81,7 +81,7 @@ import com.google.inject.multibindings.Multibinder;
  * <p>
  * Use <tt>publish()</tt> to register a resource class - a custom
  * <tt>ResourceProvider</tt> will be bound for each resource class. It's a
- * 'per-message' type and will get a new instance for each incoming message.
+ * 'per-exchange' type and will get a new instance for each incoming exchange.
  * </p>
  * <p>
  * Use <tt>serve()</tt> to configure server, e.g. set the root address.
@@ -176,7 +176,7 @@ import com.google.inject.multibindings.Multibinder;
  * of business classes are created during binding.
  * </p>
  */
-public abstract class CXFServerModule extends AbstractModule {
+public abstract class CXFServerModule implements Module {
 
 	protected final class InterceptorBuilder {
 		private String direction;
@@ -257,9 +257,10 @@ public abstract class CXFServerModule extends AbstractModule {
 			checkState(!subinjectionEnabled,
 					"Subresource injection already enabled");
 			final SubresourceInterceptor interceptor = new SubresourceInterceptor();
-			bindInterceptor(any(), resourceMethod(Injected.class), interceptor);
+			binder().bindInterceptor(any(), resourceMethod(Injected.class),
+					interceptor);
 
-			requestInjection(interceptor);
+			binder().requestInjection(interceptor);
 			subinjectionEnabled = true;
 			return enableCustomScopes();
 		}
@@ -328,19 +329,22 @@ public abstract class CXFServerModule extends AbstractModule {
 	private Multibinder<Object> providers;
 
 	private Multibinder<ResourceProvider> resourceProviders;
+	private Binder binder;
 
-	@Override
-	protected Binder binder() {
-		return super.binder().skipSources(CXFServerModule.class);
+	private Binder binder() {
+		return binder;
 	}
 
 	@Override
-	protected final void configure() {
-		checkState(resourceProviders == null, "Re-entry is not allowed.");
-		checkState(inInterceptors == null, "Re-entry is not allowed.");
-		checkState(outInterceptors == null, "Re-entry is not allowed.");
-		checkState(providers == null, "Re-entry is not allowed.");
-		checkState(config == null, "Re-entry is not allowed.");
+	public final void configure(Binder binder) {
+		checkState(this.binder == null, "Re-entry is not allowed.");
+		checkState(this.resourceProviders == null, "Re-entry is not allowed.");
+		checkState(this.inInterceptors == null, "Re-entry is not allowed.");
+		checkState(this.outInterceptors == null, "Re-entry is not allowed.");
+		checkState(this.providers == null, "Re-entry is not allowed.");
+		checkState(this.config == null, "Re-entry is not allowed.");
+
+		this.binder = binder.skipSources(CXFServerModule.class);
 
 		resourceProviders = newSetBinder(binder(), ResourceProvider.class);
 		inInterceptors = newSetBinder(binder(),
@@ -355,7 +359,7 @@ public abstract class CXFServerModule extends AbstractModule {
 		customInvoker = false;
 
 		try {
-			configureResources();
+			configure();
 
 			binder().bind(ServerConfiguration.class).toInstance(config);
 			binder().bind(JAXRSServerFactoryBean.class)
@@ -367,6 +371,7 @@ public abstract class CXFServerModule extends AbstractModule {
 						.in(SINGLETON);
 
 		} finally {
+			binder = null;
 			resourceProviders = null;
 			inInterceptors = null;
 			outInterceptors = null;
@@ -379,7 +384,7 @@ public abstract class CXFServerModule extends AbstractModule {
 	/**
 	 * Override this method to configure CXF
 	 */
-	protected abstract void configureResources();
+	protected abstract void configure();
 
 	protected final void handleRequest(Class<? extends RequestHandler> type) {
 		provide(type);

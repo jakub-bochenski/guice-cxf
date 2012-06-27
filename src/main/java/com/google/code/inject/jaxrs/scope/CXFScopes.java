@@ -16,7 +16,7 @@
 package com.google.code.inject.jaxrs.scope;
 
 import static com.google.code.inject.jaxrs.scope.CXFScopes.Marker.NULL;
-import static com.google.code.inject.jaxrs.scope.GuiceInterceptorWrapper.getOriginalMessage;
+import static com.google.code.inject.jaxrs.scope.GuiceInterceptorWrapper.getExchange;
 import static com.google.code.inject.jaxrs.util.ScopeUtils.isCircularProxy;
 import static com.google.inject.internal.util.$Preconditions.checkArgument;
 import static java.lang.annotation.ElementType.METHOD;
@@ -39,7 +39,6 @@ import javax.ws.rs.ext.Providers;
 import org.apache.cxf.jaxrs.ext.MessageContext;
 import org.apache.cxf.jaxrs.ext.MessageContextImpl;
 import org.apache.cxf.message.Exchange;
-import org.apache.cxf.message.Message;
 import org.apache.cxf.service.Service;
 
 import com.google.code.inject.jaxrs.util.ScopeUtils;
@@ -64,7 +63,7 @@ public class CXFScopes {
 		protected void configure() {
 			bindScope(RequestScope.class, REQUEST);
 
-			for (final Key<?> key : MESSAGE_CONTEXT_KEYS) {
+			for (final Key<?> key : EXCHANGE_CONTEXT_KEYS) {
 				bind(key).toProvider(DUMMY_PROVIDER).in(REQUEST);
 			}
 
@@ -72,14 +71,8 @@ public class CXFScopes {
 
 		@Provides
 		@RequestScope
-		protected MessageContext provideMessageContext(Message m) {
-			return new MessageContextImpl(m);
-		}
-
-		@Provides
-		@RequestScope
-		protected Exchange provideExchange(Message m) {
-			return m.getExchange();
+		protected MessageContext provideMessageContext(Exchange ex) {
+			return new MessageContextImpl(ex.getInMessage());
 		}
 
 		@Provides
@@ -129,7 +122,7 @@ public class CXFScopes {
 	}
 
 	/**
-	 * Dummy marker to bind {@value #MESSAGE_CONTEXT_KEYS} to
+	 * Dummy marker to bind {@value #EXCHANGE_CONTEXT_KEYS} to
 	 */
 	@SuppressWarnings("rawtypes")
 	private static final Provider DUMMY_PROVIDER = new Provider<Void>() {
@@ -137,7 +130,7 @@ public class CXFScopes {
 		@Override
 		public Void get() {
 			throw new OutOfScopeException("This should never happen -- check "
-					+ CXFScopes.class + ".MESSAGE_CONTEXT_KEYS");
+					+ CXFScopes.class + ".getKeyFromExchange(Exchange, Key)");
 		}
 	};
 
@@ -145,11 +138,11 @@ public class CXFScopes {
 	}
 
 	/**
-	 * This keys will be retrieved from message via
-	 * {@link #getKeyFromMessage(Message, Key)}
+	 * This keys will be retrieved from exchange via
+	 * {@link #getKeyFromExchange(Exchange, Key)}
 	 */
-	private static final Set<Key<?>> MESSAGE_CONTEXT_KEYS = unmodifiableSet(new HashSet<Key<?>>(
-			Arrays.<Key<?>> asList(Key.get(Message.class))));
+	private static final Set<Key<?>> EXCHANGE_CONTEXT_KEYS = unmodifiableSet(new HashSet<Key<?>>(
+			Arrays.<Key<?>> asList(Key.get(Exchange.class))));
 
 	/** Marker for @Nullable providers */
 	enum Marker {
@@ -157,42 +150,53 @@ public class CXFScopes {
 	}
 
 	/**
-	 * CXF message scope.
+	 * CXF exchange scope.
 	 */
 	public static final Scope REQUEST = new Scope() {
 		public <T> Provider<T> scope(final Key<T> key, final Provider<T> creator) {
 			final String name = key.toString();
-			return new Provider<T>() {
-				public T get() {
-
-					final Message message = getOriginalMessage();
-					synchronized (message) {
-
-						if (MESSAGE_CONTEXT_KEYS.contains(key))
-							return getKeyFromMessage(message, key);
-
-						final Object obj = message.get(name);
-						if (NULL == obj)
-							return null;
-
-						@SuppressWarnings("unchecked")
-						T t = (T) obj;
-						if (t == null) {
-							t = creator.get();
-							if (!isCircularProxy(t)) {
-								message.put(name, (t != null) ? t : NULL);
-							}
+			if (EXCHANGE_CONTEXT_KEYS.contains(key))
+				return new Provider<T>() {
+					public T get() {
+						final Exchange exchange = getExchange();
+						synchronized (exchange) {
+							return getKeyFromExchange(exchange, key);
 						}
-
-						return t;
 					}
-				}
 
-				@Override
-				public String toString() {
-					return String.format("%s[%s]", creator, REQUEST);
-				}
-			};
+					@Override
+					public String toString() {
+						return String.format("%s[%s-ex]", creator, REQUEST);
+					}
+				};
+			else
+				return new Provider<T>() {
+					public T get() {
+						final Exchange exchange = getExchange();
+						synchronized (exchange) {
+
+							final Object obj = exchange.get(name);
+							if (NULL == obj)
+								return null;
+
+							@SuppressWarnings("unchecked")
+							T t = (T) obj;
+							if (t == null) {
+								t = creator.get();
+								if (!isCircularProxy(t)) {
+									exchange.put(name, (t != null) ? t : NULL);
+								}
+							}
+
+							return t;
+						}
+					}
+
+					@Override
+					public String toString() {
+						return String.format("%s[%s]", creator, REQUEST);
+					}
+				};
 		}
 
 		@Override
@@ -202,24 +206,24 @@ public class CXFScopes {
 	};
 
 	/**
-	 * Retrieve an existing instance from message.
+	 * Retrieve an existing instance from exchange.
 	 * <p>
-	 * This method will be called for all keys in {@link #MESSAGE_CONTEXT_KEYS}
+	 * This method will be called for all keys in {@link #EXCHANGE_CONTEXT_KEYS}
 	 * 
-	 * @param message
-	 *            request message
+	 * @param exchange
+	 *            request exchange
 	 * @param key
 	 *            key to retrieve
 	 * @return instance of T, never null
 	 */
-	private static <T> T getKeyFromMessage(Message message, Key<T> key) {
+	private static <T> T getKeyFromExchange(Exchange exchange, Key<T> key) {
 		checkArgument(key.getAnnotationType() == null,
 				"Annotated keys not allowed");
 		final Class<? super T> rt = key.getTypeLiteral().getRawType();
 
-		if (Message.class.equals(rt)) {
+		if (Exchange.class.equals(rt)) {
 			@SuppressWarnings("unchecked")
-			final T t = (T) message;
+			final T t = (T) exchange;
 			return t;
 		}
 
@@ -227,11 +231,11 @@ public class CXFScopes {
 	}
 
 	/**
-	 * Returns true if {@code binding} is message-scoped. If the binding is a
+	 * Returns true if {@code binding} is exchange-scoped. If the binding is a
 	 * {@link com.google.inject.spi.LinkedKeyBinding linked key binding} and
 	 * belongs to an injector (i. e. it was retrieved via
 	 * {@link Injector#getBinding Injector.getBinding()}), then this method will
-	 * also return true if the target binding is message-scoped.
+	 * also return true if the target binding is exchange-scoped.
 	 */
 	public static boolean isRequestScoped(Binding<?> binding) {
 		return ScopeUtils.isScoped(binding, REQUEST, RequestScope.class);

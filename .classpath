@@ -5,7 +5,7 @@
 	<classpathentry kind="lib" path="dep/main/java/jsr311-api-1.1.1.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/guice-3.0.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/guice-multibindings-3.0.jar"/>
-	<classpathentry kind="lib" path="dep/main/java/cxf-2.5.2.jar"/>
+	<classpathentry kind="lib" path="dep/main/java/cxf-2.5.2.jar" sourcepath="C:/Documents and Settings/jakub/.m2/repository/org/apache/cxf/cxf-bundle/2.5.2/cxf-bundle-2.5.2-sources.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/javax.inject.jar"/>
 	<classpathentry kind="lib" path="dep/main/java/aopalliance.jar"/>
 	<classpathentry kind="output" path="bin"/>
