@@ -1,4 +1,4 @@
-/bin
-/export-jar.jardesc
-/export-jar-src.jardesc
-/dist
+target
+.settings
+.classpath
+.project
