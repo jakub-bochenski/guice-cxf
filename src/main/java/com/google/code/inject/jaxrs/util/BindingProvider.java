@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Jakub Bocheñski (kuba.bochenski@gmail.com)
+ * Copyright 2012 Jakub BocheÅ„ski (kuba.bochenski@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ public class BindingProvider<T> {
 					public Class<?> visit(
 							ProviderBinding<? extends T> providerBinding) {
 						try {
-							// FIXME this will incorrectly return any first type variable, 
+							// FIXME this will incorrectly return any first type variable,
 							// not necessarily that of Provider<T>
 							final Class<?> bound = getFirstTypeArgumentUpperBound(providerBinding
 									.getProvider().getClass());

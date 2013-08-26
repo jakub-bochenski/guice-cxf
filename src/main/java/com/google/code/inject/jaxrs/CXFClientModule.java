@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Jakub Bocheñski (kuba.bochenski@gmail.com)
+ * Copyright 2012 Jakub BocheÅ„ski (kuba.bochenski@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,9 +37,7 @@ import javax.ws.rs.ext.MessageBodyReader;
 import org.apache.cxf.Bus;
 import org.apache.cxf.binding.BindingFactoryManager;
 import org.apache.cxf.jaxrs.JAXRSBindingFactory;
-import org.apache.cxf.jaxrs.client.ClientWebApplicationException;
 import org.apache.cxf.jaxrs.client.JAXRSClientFactoryBean;
-import org.apache.cxf.jaxrs.client.ServerWebApplicationException;
 
 import com.google.code.inject.jaxrs.internal.JaxRsProvider;
 import com.google.code.inject.jaxrs.util.ParametrizedType;
@@ -55,6 +53,8 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.binder.ScopedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
 import com.google.inject.name.Names;
+import java.rmi.ServerException;
+import org.apache.cxf.jaxrs.client.ClientWebApplicationException;
 
 public abstract class CXFClientModule implements Module {
 
@@ -135,7 +135,7 @@ public abstract class CXFClientModule implements Module {
 						throw cause;
 				}
 				throw e;
-			} catch (final ServerWebApplicationException e) {
+			} catch (final ServerException e) {
 				// we need to wrap it otherwise CXF server might report them as this machine's fault
 				throw new RuntimeException("Remote server error", e);
 			}

@@ -1,5 +1,5 @@
-/*
- * Copyright 2012 Jakub Bocheñski (kuba.bochenski@gmail.com)
+    /*
+ * Copyright 2012 Jakub BocheÅ„ski (kuba.bochenski@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,30 +53,30 @@ import com.google.inject.multibindings.Multibinder;
 /**
  * CXF EDSL Module.
  * <p>
- * 
+ *
  * <b>Example usage:</b>
- * 
+ *
  * <pre>
  * protected void configureResources() {
  * 	serve().atAddress(&quot;/rest&quot;);
- * 
+ *
  * 	publish(MyResource.class);
- * 
+ *
  * 	readAndWriteBody(JAXBElementProvider.class);
  * 	readAndWriteBody(JSONProvider.class);
- * 
+ *
  * 	mapExceptions(ApplicationExceptionMapper.class);
  * }
  * </pre>
- * 
+ *
  * then do
- * 
+ *
  * <pre>
  * injector.getInstance(JAXRSServerFactoryBean.class).create();
  * </pre>
- * 
+ *
  * <p>
- * 
+ *
  * <h3>Language elements</h3>
  * <p>
  * Use <tt>publish()</tt> to register a resource class - a custom
@@ -118,7 +118,7 @@ import com.google.inject.multibindings.Multibinder;
  * It is possible to bind concrete classes, but a very nice feature is the
  * ability to bind interfaces.
  * </p>
- * 
+ *
  * <pre>
  * protected void configureResources() {
  * 	publish(ResourceInterface.class);
@@ -134,7 +134,7 @@ import com.google.inject.multibindings.Multibinder;
  * Another use of indirect binding is configuring the <tt>@Provider</tt>s, see
  * here an example configuration of the <tt>JSONProvider</tt>.
  * </p>
- * 
+ *
  * <pre>
  * &#064;Provides
  * public JSONProvider provdeJsonProvider(
@@ -147,9 +147,9 @@ import com.google.inject.multibindings.Multibinder;
  * <p>
  * <i>Of course if you implement your own <tt>@Provider</tt>s it's best to use
  * constructor/method injections directly on them.</i>
- * 
+ *
  * <h3>Bindings</h3>
- * 
+ *
  * The most important binding provided by the CXFServerModule is the
  * <tt>JAXRSServerFactoryBean</tt>. You can use it to easily create a server by
  * doing <tt>injector.getInstance(JAXRSServerFactoryBean.class).create()</tt>
@@ -284,7 +284,7 @@ public abstract class CXFServerModule implements Module {
 
 		/**
 		 * Server root address. Defaults to "/".
-		 * 
+		 *
 		 * @param address
 		 *            root address
 		 * @return self
@@ -293,14 +293,14 @@ public abstract class CXFServerModule implements Module {
 
 		/**
 		 * Enable CXF-specifix scopes
-		 * 
+		 *
 		 * @return self
 		 */
 		ServerConfigurationBuilder enableCustomScopes();
 
 		/**
 		 * Use static resource resolution
-		 * 
+		 *
 		 * @return self
 		 */
 		ServerConfigurationBuilder withStaticResourceResolution();
@@ -309,7 +309,7 @@ public abstract class CXFServerModule implements Module {
 		 * Enable AOP based sub-resource injection.
 		 * <p>
 		 * Implies {@link #enableCustomScopes()}
-		 * 
+		 *
 		 * @return self
 		 */
 		ServerConfigurationBuilder withSubresourcesInjection();
@@ -418,7 +418,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Bind custom invoker
-	 * 
+	 *
 	 * @param type
 	 *            type to bind
 	 * @return binding builder for the invoker
@@ -429,7 +429,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Bind custom invoker
-	 * 
+	 *
 	 * @param type
 	 *            type to bind
 	 * @return binding builder for the invoker
@@ -442,7 +442,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Bind custom invoker
-	 * 
+	 *
 	 * @param type
 	 *            type to bind
 	 * @return binding builder for the invoker
@@ -478,7 +478,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Bind a resource class
-	 * 
+	 *
 	 * @param resourceKey
 	 *            to bind
 	 */
@@ -502,7 +502,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Bind a resource class
-	 * 
+	 *
 	 * @param type
 	 *            to bind
 	 */
@@ -513,7 +513,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Bind a resource class
-	 * 
+	 *
 	 * @param type
 	 *            to bind
 	 */
@@ -537,7 +537,7 @@ public abstract class CXFServerModule implements Module {
 
 	/**
 	 * Configure server
-	 * 
+	 *
 	 * @return configuration builder
 	 */
 	protected final ServerConfigurationBuilder serve() {

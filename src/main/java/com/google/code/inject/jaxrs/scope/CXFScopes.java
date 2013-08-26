@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Jakub Bocheñski (kuba.bochenski@gmail.com)
+ * Copyright 2012 Jakub BocheÅ„ski (kuba.bochenski@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -209,7 +209,7 @@ public class CXFScopes {
 	 * Retrieve an existing instance from exchange.
 	 * <p>
 	 * This method will be called for all keys in {@link #EXCHANGE_CONTEXT_KEYS}
-	 * 
+	 *
 	 * @param exchange
 	 *            request exchange
 	 * @param key

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Jakub Bocheñski (kuba.bochenski@gmail.com)
+ * Copyright 2012 Jakub BocheÅ„ski (kuba.bochenski@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ public class ScopeUtils {
 	 * belongs to an injector (ie. it was retrieved via
 	 * {@link Injector#getBinding Injector.getBinding()}), then this method will
 	 * also true if the target binding is singleton-scoped.
-	 * 
+	 *
 	 * @since 3.0
 	 */
 	public static boolean isSingleton(Binding<?> binding) {
@@ -99,13 +99,13 @@ public class ScopeUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Returns true if {@code binding} has the given scope. If the binding is a
 	 * {@link com.google.inject.spi.LinkedKeyBinding linked key binding} and
 	 * belongs to an injector (ie. it was retrieved via
 	 * {@link Injector#getBinding Injector.getBinding()}), then this method will
 	 * also true if the target binding has the given scope.
-	 * 
+	 *
 	 * @param binding
 	 *            binding to check
 	 * @param scope
@@ -182,7 +182,7 @@ public class ScopeUtils {
 					.getProviderInstance();
 
 			if (providerInstance instanceof Multibinder) {
-				// multibinder scope is effectively equal to the scope of it's member bindings				
+				// multibinder scope is effectively equal to the scope of it's member bindings
 				return null;
 			}
 
