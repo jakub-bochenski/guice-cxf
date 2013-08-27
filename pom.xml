@@ -4,11 +4,35 @@
 
 	<groupId>com.google.code.inject</groupId>
 	<artifactId>guice-cxf</artifactId>
-	<version>0.2-SNAPSHOT</version>
-	<packaging>jar</packaging>
+	<version>0.2-SNAPSHOT</version>   
+	<packaging>jar</packaging>   
+  <url>http://code.google.com/p/guice-cxf/</url>
+  
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  
+  <scm>
+    <connection>scm:git:https://code.google.com/p/guice-cxf/</connection>
+    <developerConnection>scm:git:https://code.google.com/p/guice-cxf/</developerConnection>
+    <url>http://code.google.com/p/guice-cxf/source/browse</url>
+  </scm>   
+  
+  <developers>
+    <developer>
+      <name>Jakub Bocheński</name>
+      <email>kuba.bochenski+guice-cxf@gmail.com</email>
+    </developer>
+  </developers>
+ 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding> 
 	</properties>
+   
 	<build>
 		<plugins>
 			<plugin>
