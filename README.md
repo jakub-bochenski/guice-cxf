@@ -80,4 +80,4 @@ To create a server do:
 
 The current version is well tested and working, although not all CXF features can be configured yet (you can always set them on the provided JAXRSServerFactoryBean instance).
 
-See the [Features] page for a more complete list.
+See the [Features](https://github.com/jakub-bochenski/guice-cxf/wiki/Features) page for a more complete list.
