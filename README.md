@@ -5,7 +5,7 @@ Provides a configured JAXRSServerFactoryBean instance that you can use to start 
 Resources and providers will be created with Guice, then they will have the normal CXF/JAX-RS injections performed on them.
 
 Example:
-```
+```java
 protected void configure() {		 
  serve().atAddress("/rest");
   
@@ -19,7 +19,7 @@ protected void configure() {
 ```
 
 guice-cxf supports injecting Jax-Rs resource with dependencies bound in Guice.
-```
+```java
 @Path("foo");
 public class LibraryResource {
 
@@ -37,13 +37,12 @@ public class LibraryResource {
 
 You can also enable injecting sub-resources instead of creating them manually;
 
-```
-
+```java
 protected void configure(){
  bind(BookResource.class).in(REQUEST);
 }
 ```
-```
+```java
 @Path("foo");
 public class LibraryResource {
    // [...]
@@ -59,7 +58,7 @@ public class LibraryResource {
 
 Finally you can inject @Context dependencies (`HttpHeaders`, `Request`, `UriInfo` etc.), provided you are in appropriate scope (there is a special REQUEST scope provided for Jax-Rs requets).
 
-``` 
+```java
 public class BookTitleResolver {
    @Inject
    private HttpHeaders headers;
@@ -75,7 +74,7 @@ public class BookTitleResolver {
 
 To create a server do:
 
-```
+```java
   injector.getInstance(JAXRSServerFactoryBean.class).create();
 ```
 
