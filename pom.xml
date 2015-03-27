@@ -5,8 +5,9 @@
 	<groupId>com.google.code.inject</groupId>
 	<artifactId>guice-cxf</artifactId>
 	<version>0.2-SNAPSHOT</version>   
-	<packaging>jar</packaging>   
-  <url>http://code.google.com/p/guice-cxf/</url>
+	<packaging>jar</packaging>
+	
+  <url>https://github.com/jakub-bochenski/guice-cxf</url>
   
   <licenses>
     <license>
@@ -16,10 +17,15 @@
     </license>
   </licenses>
   
+  <issueManagement>
+    <url>https://github.com/jakub-bochenski/guice-cxf/issues</url>
+    <system>GitHub Issues</system>
+  </issueManagement>
+  
   <scm>
-    <connection>scm:git:https://code.google.com/p/guice-cxf/</connection>
-    <developerConnection>scm:git:https://code.google.com/p/guice-cxf/</developerConnection>
-    <url>http://code.google.com/p/guice-cxf/source/browse</url>
+    <url>https://github.com/jakub-bochenski/guice-cxf</url>  
+    <connection>scm:git:https://github.com/jakub-bochenski/guice-cxf.git</connection>
+    <developerConnection>sscm:git:https://github.com/jakub-bochenski/guice-cxf.git</developerConnection>
   </scm>   
   
   <developers>
